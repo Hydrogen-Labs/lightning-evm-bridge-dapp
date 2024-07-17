@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import { Toaster } from "react-hot-toast";
-import { WagmiConfig } from "wagmi";
+import { WagmiConfig, useAccount } from "wagmi";
 import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
@@ -17,13 +17,23 @@ import { appChains } from "~~/services/web3/wagmiConnectors";
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   const { price } = useLightningApp();
-  const setNativeCurrencyPrice = useGlobalState(state => state.setNativeCurrencyPrice);
+  const { setAccount, setNativeCurrencyPrice } = useGlobalState();
+  const { address } = useAccount();
 
   useEffect(() => {
     if (price > 0) {
       setNativeCurrencyPrice(price);
     }
   }, [setNativeCurrencyPrice, price]);
+
+  // Update account-related state
+  useEffect(() => {
+    if (address) {
+      setAccount(address);
+    } else {
+      setAccount("");
+    }
+  }, [address, setAccount]);
 
   return (
     <>

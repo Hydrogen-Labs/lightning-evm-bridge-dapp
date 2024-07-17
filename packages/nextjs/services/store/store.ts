@@ -12,6 +12,8 @@ import { ChainWithAttributes } from "~~/utils/scaffold-eth";
  */
 
 type GlobalState = {
+  account: string | undefined;
+  setAccount: (newAccount: string) => void;
   nativeCurrencyPrice: number;
   setNativeCurrencyPrice: (newNativeCurrencyPriceState: number) => void;
   targetNetwork: ChainWithAttributes;
@@ -19,6 +21,8 @@ type GlobalState = {
 };
 
 export const useGlobalState = create<GlobalState>(set => ({
+  account: undefined,
+  setAccount: (newAccount: string) => set({ account: newAccount }),
   nativeCurrencyPrice: 0,
   setNativeCurrencyPrice: (newValue: number): void => set(() => ({ nativeCurrencyPrice: newValue })),
   targetNetwork: scaffoldConfig.targetNetworks[0],

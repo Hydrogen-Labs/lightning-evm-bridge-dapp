@@ -3,8 +3,10 @@ import "react-toastify/dist/ReactToastify.css";
 import { useWalletClient } from "wagmi";
 import { HistoricalTransaction, useLightningApp } from "~~/hooks/LightningProvider";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { useGlobalState } from "~~/services/store/store";
 
 export const HistoryTable = () => {
+  const { account } = useGlobalState();
   const { transactions, addTransaction, toastSuccess, toastError } = useLightningApp();
   const [expandedRow, setExpandedRow] = useState<number | null>(null); // State to manage expanded row index
   const { data: walletClient } = useWalletClient();
@@ -87,7 +89,8 @@ export const HistoryTable = () => {
                   {" "}
                   {/* Move React.Fragment key to tbody */}
                   <tr
-                    onClick={() => toggleRow(index)}
+                    // onClick={() => toggleRow(index)}
+                    onClick={account ? () => toggleRow(index) : null}
                     className={`cursor-pointer ${
                       transaction.status === "failed" ? "bg-red-400" : ""
                     } hover:bg-white hover:bg-opacity-10`}

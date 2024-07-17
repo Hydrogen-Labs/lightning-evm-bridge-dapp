@@ -12,7 +12,8 @@
     "dotenv": "^16.4.5",
     "ethers": "^6.12.1",
     "express": "^4.19.2",
-    "js-sha256": "^0.11.0"
+    "js-sha256": "^0.11.0",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@types/body-parser": "^1.19.5",
