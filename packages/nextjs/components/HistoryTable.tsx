@@ -25,10 +25,13 @@ export const HistoryTable = () => {
   });
 
   useEffect(() => {
-    // Fetch transactions from the database
     async function fetchTransactions() {
+      if (!account) {
+        setTransactions([]);
+        return;
+      }
+
       try {
-        // const response = await fetch("/api/transactions");
         const response = await fetch(`/api/transactions?userAddress=${account}`);
         const data: Transaction[] = await response.json();
         setTransactions(data);

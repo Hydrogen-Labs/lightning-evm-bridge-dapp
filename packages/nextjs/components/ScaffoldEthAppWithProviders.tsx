@@ -56,7 +56,7 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
       <RainbowKitProvider
         chains={[...appChains.chains, botanixTestnet]}
         avatar={BlockieAvatar}
-        theme={isDarkMode ? darkTheme() : lightTheme()}
+        // theme={isDarkMode ? darkTheme() : lightTheme()}
       >
         <LightningProvider>
           <ScaffoldEthApp>{children}</ScaffoldEthApp>

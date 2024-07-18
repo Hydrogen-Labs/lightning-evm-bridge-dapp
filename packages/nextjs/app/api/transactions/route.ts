@@ -68,8 +68,9 @@ export async function GET(req: NextRequest) {
     const transactions = await prisma.transaction.findMany({
       where: { userAddress }, // Filter transactions by userAddress
     });
-    console.log("Fetched transactions from the database:", transactions);
-    return NextResponse.json(transactions, { status: 200 });
+    const reversedTransactions = transactions.reverse(); // Reverse the array
+    console.log("Fetched transactions from the database:", reversedTransactions);
+    return NextResponse.json(reversedTransactions, { status: 200 });
   } catch (error) {
     console.error("Failed to fetch transactions:", error);
     return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 });

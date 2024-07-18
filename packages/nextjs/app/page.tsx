@@ -46,8 +46,9 @@ const Home = () => {
         <div className="card w-[500px] ">
           {account ? (
             <div className="card-header text-white p-4">
+              <h1 className="cursor-default text-center text-3xl font-mono mt-10">Balance</h1>
               <h1
-                className="cursor-pointer text-center text-3xl font-mono mt-10"
+                className="cursor-pointer text-center text-3xl font-mono"
                 onClick={() => setBalanceVisibility((balanceVisibility + 1) % 3)}
               >
                 {getBalanceWithVisibility()}
