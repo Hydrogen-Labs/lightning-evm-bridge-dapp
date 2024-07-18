@@ -1,19 +1,44 @@
-import React, { Fragment, useState } from "react";
+import React, { useEffect, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useWalletClient } from "wagmi";
-import { HistoricalTransaction, useLightningApp } from "~~/hooks/LightningProvider";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
 import { useGlobalState } from "~~/services/store/store";
 
+type Transaction = {
+  status: string;
+  date: string;
+  amount: number;
+  txHash: string;
+  contractId: string;
+  hashLockTimestamp: number;
+  lnInvoice: string;
+};
+
 export const HistoryTable = () => {
   const { account } = useGlobalState();
-  const { transactions, addTransaction, toastSuccess, toastError } = useLightningApp();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expandedRow, setExpandedRow] = useState<number | null>(null); // State to manage expanded row index
   const { data: walletClient } = useWalletClient();
   const { data: htlcContract } = useScaffoldContract({
     contractName: "HashedTimelock",
     walletClient,
   });
+
+  useEffect(() => {
+    // Fetch transactions from the database
+    async function fetchTransactions() {
+      try {
+        // const response = await fetch("/api/transactions");
+        const response = await fetch(`/api/transactions?userAddress=${account}`);
+        const data: Transaction[] = await response.json();
+        setTransactions(data);
+      } catch (error) {
+        console.error("Failed to fetch transactions:", error);
+      }
+    }
+    fetchTransactions();
+  }, [account]);
+
   const toggleRow = (index: number | null) => {
     setExpandedRow(expandedRow === index ? null : index); // Toggle between null and the current index
     if (index === null) return;
@@ -23,12 +48,7 @@ export const HistoryTable = () => {
     }
   };
 
-  const toastAndCopy = (text: string, message: string) => {
-    navigator.clipboard.writeText(text);
-    toastSuccess(message);
-  };
-
-  function getTooltipText(transaction: HistoricalTransaction) {
+  function getTooltipText(transaction: Transaction) {
     switch (transaction.status) {
       case "pending":
         return "Waiting for the transaction to be included in a block";
@@ -43,7 +63,7 @@ export const HistoryTable = () => {
     }
   }
 
-  function refund(transaction: HistoricalTransaction) {
+  function refund(transaction: Transaction) {
     if (transaction.contractId === "") return;
     if (transaction.hashLockTimestamp > Date.now() / 1000) {
       return;
@@ -53,20 +73,12 @@ export const HistoryTable = () => {
       .refund([transaction.contractId as `0x${string}`], {})
       .then(tx => {
         console.log(tx);
-        toastSuccess("Refund Successful");
-        addTransaction({
-          status: "refunded",
-          date: new Date().toLocaleString(),
-          amount: transaction.amount,
-          txHash: tx,
-          contractId: transaction.contractId,
-          hashLockTimestamp: transaction.hashLockTimestamp,
-          lnInvoice: transaction.lnInvoice,
-        });
+        setTransactions(prevTransactions =>
+          prevTransactions.map(t => (t.txHash === transaction.txHash ? { ...t, status: "refunded" } : t)),
+        );
       })
       .catch(e => {
         console.error(e);
-        toastError("Refund Failed");
       });
   }
 
@@ -74,7 +86,7 @@ export const HistoryTable = () => {
     <div className="card bg-brand-bg text-white font-mono">
       <div className="card-body p-4">
         <h2 className="text-center font-mono text-md">History</h2>
-        <table className="table table-auto w-full text-sm ">
+        <table className="table table-auto w-full text-sm">
           {transactions.length > 0 && (
             <>
               <thead>
@@ -86,18 +98,15 @@ export const HistoryTable = () => {
               </thead>
               {transactions.map((transaction, index) => (
                 <tbody key={index}>
-                  {" "}
-                  {/* Move React.Fragment key to tbody */}
                   <tr
-                    // onClick={() => toggleRow(index)}
-                    onClick={account ? () => toggleRow(index) : null}
+                    // onClick={account ? () => toggleRow(index) : null}
                     className={`cursor-pointer ${
                       transaction.status === "failed" ? "bg-red-400" : ""
                     } hover:bg-white hover:bg-opacity-10`}
                   >
                     <td>{transaction.status}</td>
                     <td className="tooltip" data-tip={getTooltipText(transaction)}>
-                      {transaction.date}
+                      {new Date(transaction.date).toLocaleString()}
                     </td>
                     <td className="text-right">{transaction.amount} sats</td>
                   </tr>
@@ -110,7 +119,10 @@ export const HistoryTable = () => {
                           <br />
                           <button
                             className="btn btn-neutral text-white text-xs p-2"
-                            onClick={() => toastAndCopy(transaction.txHash, "Transaction hash copied to clipboard")}
+                            onClick={() => {
+                              navigator.clipboard.writeText(transaction.txHash);
+                              console.log("Transaction hash copied to clipboard");
+                            }}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -132,7 +144,10 @@ export const HistoryTable = () => {
                           <br />
                           <button
                             className="btn btn-neutral text-white text-xs p-2"
-                            onClick={() => toastAndCopy(transaction.contractId, "Contract ID copied to clipboard")}
+                            onClick={() => {
+                              navigator.clipboard.writeText(transaction.contractId);
+                              console.log("Contract ID copied to clipboard");
+                            }}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -161,9 +176,15 @@ export const HistoryTable = () => {
           {transactions.length === 0 && (
             <tbody>
               <tr>
-                <td className="text-center py-4" colSpan={3}>
-                  No history...go send your first lightning payment!
-                </td>
+                {account ? (
+                  <td className="text-center py-4" colSpan={3}>
+                    No history...go send your first lightning payment!
+                  </td>
+                ) : (
+                  <td className="text-center py-4" colSpan={3}>
+                    Connect your wallet to view transaction history
+                  </td>
+                )}
               </tr>
             </tbody>
           )}
