@@ -228,7 +228,7 @@ const deployedContracts = {
 	},
 	11155111: {
 		HashedTimelock: {
-			address: '0x224a9a245EF6224D4Fa8c8598875A4A6419d6325',
+			address: '0x1a88317e0d84A8f719458ad645F1D65b554f3707',
 			abi: [
 				{
 					anonymous: false,

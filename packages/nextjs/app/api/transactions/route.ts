@@ -11,9 +11,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
   }
 
-  // Convert hashLockTimestamp to a valid Date object
-  // const formattedHashLockTimestamp = new Date(hashLockTimestamp * 1000);
-
   try {
     const existingTransaction = await prisma.transaction.findFirst({
       where: {
@@ -31,7 +28,7 @@ export async function POST(req: NextRequest) {
           status,
           date: dateObject,
           amount,
-          // hashLockTimestamp: formattedHashLockTimestamp,
+          contractId,
           hashLockTimestamp,
           lnInvoice,
           userAddress,
@@ -46,7 +43,6 @@ export async function POST(req: NextRequest) {
           amount,
           txHash,
           contractId,
-          // hashLockTimestamp: formattedHashLockTimestamp,
           hashLockTimestamp,
           lnInvoice,
           userAddress,
@@ -74,10 +70,12 @@ export async function GET(req: NextRequest) {
   try {
     const transactions = await prisma.transaction.findMany({
       where: { userAddress }, // Filter transactions by userAddress
+      orderBy: {
+        date: "desc", // Order transactions by date in descending order
+      },
     });
-    const reversedTransactions = transactions.reverse(); // Reverse the array
-    console.log("Fetched transactions from the database:", reversedTransactions);
-    return NextResponse.json(reversedTransactions, { status: 200 });
+    console.log("Fetched transactions from the database:", transactions);
+    return NextResponse.json(transactions, { status: 200 });
   } catch (error) {
     console.error("Failed to fetch transactions:", error);
     return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 });
