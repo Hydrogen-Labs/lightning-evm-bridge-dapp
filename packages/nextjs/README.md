@@ -8,6 +8,7 @@ This webapp is the front-end component of the Lightning EVM Bridge project, desi
 
 - Node.js (v18 LTS)
 - Yarn (v1 or v2+)
+- PostgreSQL
 
 ### Installation
 
@@ -22,6 +23,23 @@ This webapp is the front-end component of the Lightning EVM Bridge project, desi
 
    ```bash
    yarn install
+   ```
+
+3. **Setting Up PostgreSQL (macOS (using Homebrew)):**
+
+   ```bash
+   brew install postgresql
+   brew services start postgresql
+   psql postgres
+   CREATE DATABASE mydatabase;
+   \q
+   ```
+
+4. **Setting Up Prisma:**
+
+   ```bash
+   yarn prisma generate
+   yarn prisma migrate dev --name init
    ```
 
 ### Environment Configuration

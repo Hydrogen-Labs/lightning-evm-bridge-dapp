@@ -5,6 +5,7 @@ import { Scanner } from "@yudiel/react-qr-scanner";
 import { PaymentRequestObject, decode } from "bolt11";
 import { useWalletClient } from "wagmi";
 import { PaymentInvoice } from "~~/components/PaymentInvoice";
+import { useLightningApp } from "~~/hooks/LightningProvider";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
 import { useGlobalState } from "~~/services/store/store";
 import { LnPaymentInvoice } from "~~/types/utils";
@@ -17,10 +18,10 @@ type SendModalProps = {
 
 function SendModal({ isOpen, onClose }: SendModalProps) {
   const { account } = useGlobalState();
+  const { addTransaction, transactions, toastError } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
   const lnInvoiceRef = useRef<LnPaymentInvoice | null>(null);
   const [contractId, setContractId] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
 
   function cleanAndClose() {
     lnInvoiceRef.current = null;
@@ -31,23 +32,7 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
   }
 
   useEffect(() => {
-    // Fetch transactions from the database
-    async function fetchTransactions() {
-      try {
-        const response = await fetch(`/api/transactions?userAddress=${account}`);
-        const data = await response.json();
-        setTransactions(data);
-      } catch (error) {
-        console.error("Failed to fetch transactions:", error);
-      }
-    }
-    if (account) {
-      fetchTransactions();
-    }
-  }, [account]);
-
-  useEffect(() => {
-    // Check if the latest transaction has a contractId then update the active step to 3
+    // check if the latest transaction has a contractId then update the active step to 3
     if (transactions.length === 0) return;
     const lastTransaction = transactions[0];
     if (lastTransaction.lnInvoice !== lnInvoiceRef.current?.lnInvoice) return;
@@ -86,6 +71,7 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
   }
 
   function getPaymentHash(requestObject: PaymentRequestObject): `0x${string}` | undefined {
+    // go through the tags and find the 'payment_hash' tagName and return the 'data'
     const paymentHash = requestObject.tags.find((tag: any) => tag.tagName === "payment_hash");
     if (!paymentHash) {
       return undefined;
@@ -93,51 +79,41 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
     return ("0x" + paymentHash.data.toString()) as `0x${string}`;
   }
 
-  async function submitPayment() {
+  function submitPayment() {
     console.log("submitting payment");
     if (!htlcContract) return;
     if (!lnInvoiceRef.current) return;
-    try {
-      const tx = await htlcContract.write.newContract(
+    htlcContract.write
+      .newContract(
         [
-          process.env.LSP_ADDRESS ?? "0xf89335a26933d8Dd6193fD91cAB4e1466e5198Bf",
+          process.env.LSP_ADDRESS ?? "0x7A02Bb41bBBd306A8E05d407928eaACeDF9c9395",
           lnInvoiceRef.current.paymentHash,
           BigInt(getMinTimelock(lnInvoiceRef.current.timeExpireDate)),
         ],
         {
           value: BigInt(lnInvoiceRef.current.satoshis * GWEIPERSAT),
         },
-      );
-      console.log("txHash", tx);
-      const newTransaction = {
-        status: "pending",
-        date: new Date().toLocaleString(),
-        amount: lnInvoiceRef.current ? lnInvoiceRef.current.satoshis : 0,
-        txHash: tx,
-        contractId: contractId || "",
-        hashLockTimestamp: getMinTimelock(lnInvoiceRef.current ? lnInvoiceRef.current.timeExpireDate : 0),
-        lnInvoice: lnInvoiceRef.current ? lnInvoiceRef.current.lnInvoice : "",
-        userAddress: account, // Include userAddress
-      };
-      setTransactions([newTransaction, ...transactions]);
-      setActiveStep(2);
-
-      // Save transaction to database
-      await fetch("/api/transactions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newTransaction),
-      });
-    } catch (e) {
-      if (e instanceof Error) {
+      )
+      .then(tx => {
+        console.log("txHash", tx);
+        addTransaction({
+          status: "pending",
+          date: new Date().toISOString(), // Use ISO string for consistency
+          amount: lnInvoiceRef.current ? lnInvoiceRef.current.satoshis : 0,
+          txHash: tx,
+          contractId: contractId || "",
+          hashLockTimestamp: lnInvoiceRef.current ? lnInvoiceRef.current.timeExpireDate : 0,
+          lnInvoice: lnInvoiceRef.current ? lnInvoiceRef.current.lnInvoice : "",
+          userAddress: account ?? "",
+          transactionType: "SENT",
+        });
+        setActiveStep(2);
+      })
+      .catch(e => {
         console.error(e.message);
-      } else {
-        console.error(e);
-      }
-      cleanAndClose();
-    }
+        toastError("User rejected transaction");
+        cleanAndClose();
+      });
   }
 
   function handleInvoiceChange(invoice: string) {
@@ -149,6 +125,8 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
       if (!tempdecoded.satoshis) return;
       if (!paymentHash) return;
       if (!tempdecoded.timeExpireDate) return;
+
+      console;
 
       lnInvoiceRef.current = {
         satoshis: tempdecoded.satoshis,
@@ -179,7 +157,11 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
               {!lnInvoiceRef.current && (
                 <div className="flex w-full flex-col items-center gap-5">
                   {/* QR Scanner */}
-                  <Scanner onError={handleError} onResult={result => handleScan(result)} />
+                  <Scanner
+                    onError={handleError}
+                    onResult={result => handleScan(result)}
+                    // onDecode={result => handleScan(result)}
+                  />
                   <div className="join w-full">
                     <button
                       className="btn join-item cursor-pointer bg-gray-600 p-2"

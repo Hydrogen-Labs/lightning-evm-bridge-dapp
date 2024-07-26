@@ -35,6 +35,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     hodlInvoiceResponse,
     setHashLock,
     recieveContractId,
+    addTransaction,
   } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
@@ -66,6 +67,19 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
         setActiveStep(3);
         setTxHash(msg.txHash);
         console.log("Relay Response", msg);
+
+        // Add transaction after successful relay
+        // addTransaction({
+        //   status: "relayed",
+        //   date: new Date().toISOString(),
+        //   amount: Number(amount),
+        //   txHash: msg.txHash,
+        //   contractId: recieveContractId,
+        //   hashLockTimestamp: hashLock?.hash || 0,
+        //   lnInvoice: lnInvoiceRef.current?.lnInvoice || "",
+        //   userAddress: recipientAddress,
+        //   transactionType: "RECEIVED",
+        // });
       } else {
         toastError("Failed to relay contract and preimage");
       }
@@ -133,6 +147,19 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
         await waitForTransaction({ hash: txHash });
         setTxHash(txHash);
         setActiveStep(3);
+
+        // Add transaction after successful withdrawal
+        // addTransaction({
+        //   status: "completed",
+        //   date: new Date().toISOString(),
+        //   amount: Number(amount),
+        //   txHash: txHash,
+        //   contractId: recieveContractId,
+        //   hashLockTimestamp: hashLock?.hash || 0,
+        //   lnInvoice: lnInvoiceRef.current?.lnInvoice || "",
+        //   userAddress: recipientAddress,
+        //   transactionType: "RECEIVED",
+        // });
       } catch (error) {
         console.error("Failed to fetch contract details:", error);
         if (retries > 0) {

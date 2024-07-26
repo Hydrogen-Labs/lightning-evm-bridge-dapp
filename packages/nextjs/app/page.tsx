@@ -43,7 +43,7 @@ const Home = () => {
     <>
       <div className="bg-oval-gradient justify-center absolute bg-gradient-to-r from-yellow-400 to-violet-800 opacity-25" />
       <div className="font-plex container mx-auto flex h-[95%] items-center justify-center">
-        <div className="card w-[500px] ">
+        <div className="card w-[750px] ">
           {account ? (
             <div className="card-header text-white p-4">
               <h1 className="cursor-default text-center text-3xl font-mono mt-10">Balance</h1>

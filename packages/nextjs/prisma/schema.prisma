@@ -7,15 +7,20 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum TransactionType {
+  RECEIVED
+  SENT
+}
+
 model Transaction {
-  id                Int      @id @default(autoincrement())
+  id                Int              @id @default(autoincrement())
   status            String
   date              DateTime
   amount            Int
   txHash            String
   contractId        String
-  hashLockTimestamp DateTime
+  hashLockTimestamp Int
   lnInvoice         String
   userAddress       String
+  transactionType   TransactionType
 }
-

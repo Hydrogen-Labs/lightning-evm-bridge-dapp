@@ -2,57 +2,64 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "../../../lib/prisma";
 
 export async function POST(req: NextRequest) {
-  const {
-    status,
-    date,
-    amount,
-    txHash,
-    contractId,
-    hashLockTimestamp,
-    lnInvoice,
-    userAddress, // Include userAddress in the request
-  } = await req.json();
+  const { status, date, amount, txHash, contractId, hashLockTimestamp, lnInvoice, userAddress, transactionType } =
+    await req.json();
 
-  console.log("Received transaction data:", {
-    status,
-    date,
-    amount,
-    txHash,
-    contractId,
-    hashLockTimestamp,
-    lnInvoice,
-    userAddress, // Log the userAddress
-  });
-
-  // Convert date string to a valid Date object
-  const [datePart, timePart] = date.split(", ");
-  const [day, month, year] = datePart.split("/");
-  const formattedDate = `${year}-${month}-${day}T${timePart}`;
-  const dateObject = new Date(formattedDate);
+  // Parse date string to a valid Date object
+  const dateObject = new Date(date);
+  if (isNaN(dateObject.getTime())) {
+    return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
+  }
 
   // Convert hashLockTimestamp to a valid Date object
-  const formattedHashLockTimestamp = new Date(hashLockTimestamp * 1000);
+  // const formattedHashLockTimestamp = new Date(hashLockTimestamp * 1000);
 
   try {
-    const newTransaction = await prisma.transaction.create({
-      data: {
-        status,
-        date: dateObject,
-        amount,
-        txHash,
-        contractId,
-        hashLockTimestamp: formattedHashLockTimestamp,
-        lnInvoice,
-        userAddress, // Store userAddress
+    const existingTransaction = await prisma.transaction.findFirst({
+      where: {
+        OR: [{ txHash: txHash }, { contractId: contractId }],
       },
     });
 
-    console.log("Transaction successfully added to the database:", newTransaction);
+    let newTransaction;
+    if (existingTransaction) {
+      newTransaction = await prisma.transaction.update({
+        where: {
+          id: existingTransaction.id,
+        },
+        data: {
+          status,
+          date: dateObject,
+          amount,
+          // hashLockTimestamp: formattedHashLockTimestamp,
+          hashLockTimestamp,
+          lnInvoice,
+          userAddress,
+          transactionType,
+        },
+      });
+    } else {
+      newTransaction = await prisma.transaction.create({
+        data: {
+          status,
+          date: dateObject,
+          amount,
+          txHash,
+          contractId,
+          // hashLockTimestamp: formattedHashLockTimestamp,
+          hashLockTimestamp,
+          lnInvoice,
+          userAddress,
+          transactionType,
+        },
+      });
+    }
 
+    console.log("Transaction successfully added/updated in the database:", newTransaction);
     return NextResponse.json(newTransaction, { status: 201 });
   } catch (error) {
-    console.error("Failed to create transaction:", error);
-    return NextResponse.json({ error: "Failed to create transaction" }, { status: 500 });
+    console.error("Failed to create/update transaction:", error);
+    return NextResponse.json({ error: "Failed to create/update transaction" }, { status: 500 });
   }
 }
 

@@ -12,6 +12,7 @@ import { LightningProvider, useLightningApp } from "~~/hooks/LightningProvider";
 import { useDarkMode } from "~~/hooks/scaffold-eth/useDarkMode";
 import { useGlobalState } from "~~/services/store/store";
 import { botanixTestnet } from "~~/services/web3/botanixTestnet";
+import { sepoliaTestnet } from "~~/services/web3/sepoliaTestnet";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { appChains } from "~~/services/web3/wagmiConnectors";
 
@@ -54,7 +55,8 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     <WagmiConfig config={wagmiConfig}>
       <ProgressBar />
       <RainbowKitProvider
-        chains={[...appChains.chains, botanixTestnet]}
+        // chains={[...appChains.chains, botanixTestnet]}
+        chains={[...appChains.chains, sepoliaTestnet]}
         avatar={BlockieAvatar}
         // theme={isDarkMode ? darkTheme() : lightTheme()}
       >

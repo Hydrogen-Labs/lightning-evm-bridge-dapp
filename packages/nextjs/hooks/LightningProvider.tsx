@@ -11,17 +11,20 @@ import {
 } from "@lightning-evm-bridge/shared";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { useGlobalState } from "~~/services/store/store";
 import { HashLock } from "~~/types/utils";
 
 // Define the types for your historical transactions and context
 export type HistoricalTransaction = {
-  status: "pending" | "failed" | "completed" | "refunded";
+  status: "pending" | "failed" | "completed" | "refunded" | "relayed";
   date: string;
   amount: number;
   contractId: string;
   txHash: string;
   hashLockTimestamp: number;
   lnInvoice: string;
+  userAddress: string;
+  transactionType: "RECEIVED" | "SENT";
 };
 
 export type LightningAppContextType = {
@@ -47,6 +50,7 @@ const HistoricalTransactionsContext = createContext<LightningAppContextType | un
 
 // Provider component
 export const LightningProvider = ({ children }: { children: React.ReactNode }) => {
+  const { setDbUpdated } = useGlobalState();
   const price = useNativeCurrencyPrice();
   const [hashLock, setHashLock] = useState<HashLock | null>(null);
   const [transactions, setTransactionsState] = useState<HistoricalTransaction[]>([]);
@@ -68,6 +72,17 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     hodlInvoiceResponse,
   } = useWebSocket(process.env.WEBSOCKET_URL ?? "ws://localhost:3003");
 
+  console.log("transactions 999", transactions);
+  console.log(
+    "data 999",
+    data,
+    isWebSocketConnected,
+    status,
+    lnInitationResponse,
+    hodlInvoiceResponse,
+    recieveContractId,
+  );
+
   const toastSuccess = (message: string) => {
     toast.success(message, {
       position: "top-center",
@@ -88,17 +103,28 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     contractName: "HashedTimelock",
     eventName: "LogHTLCNew",
     listener: event => {
+      console.log("Event received:", event);
       const tmpContractId = event[0].args.contractId as string;
       const txHash = event[0].transactionHash;
-      if (!tmpContractId) return;
-      // check if the transaction has the same has as one of the transactions in the list
+      console.log("Parsed Event Data:", { tmpContractId, txHash });
+
+      if (!tmpContractId) {
+        console.log("No contract ID found in event");
+        return;
+      }
+
       const index = transactionRef.current.findIndex(t => t.txHash === txHash);
-      if (index === -1) return;
+      if (index === -1) {
+        console.log("Transaction hash not found in existing transactions");
+        return;
+      }
+
       sendMessage({
         contractId: tmpContractId,
         kind: KIND.INVOICE_SEND,
         lnInvoice: transactionRef.current[index]?.lnInvoice,
       });
+
       setInvoiceContractIdPair([tmpContractId, transactionRef.current[index]?.lnInvoice]);
     },
   });
@@ -116,6 +142,8 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
       contractId,
       hashLockTimestamp: lastTransaction.hashLockTimestamp,
       lnInvoice,
+      userAddress: lastTransaction.userAddress,
+      transactionType: lastTransaction.transactionType,
     });
   }, [invoiceContractIdPair]);
 
@@ -124,49 +152,80 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     const lastTransaction = transactionRef.current[0];
     if (lastTransaction === undefined) return;
 
+    const updatedTransaction: HistoricalTransaction = {
+      ...lastTransaction,
+      status: data?.status === "success" ? "completed" : ("failed" as "completed" | "failed"),
+    };
+
+    addTransaction(updatedTransaction);
+
     if (data?.status === "success") {
-      addTransaction({
-        status: "completed",
-        date: lastTransaction.date,
-        amount: lastTransaction.amount,
-        txHash: lastTransaction.txHash,
-        contractId: lastTransaction.contractId,
-        hashLockTimestamp: lastTransaction.hashLockTimestamp,
-        lnInvoice: lastTransaction.lnInvoice,
-      });
       toastSuccess("Payment successful");
     } else {
       toastError(data.message);
-      addTransaction({
-        status: "failed",
-        date: lastTransaction.date,
-        amount: lastTransaction.amount,
-        txHash: lastTransaction.txHash,
-        contractId: lastTransaction.contractId,
-        hashLockTimestamp: lastTransaction.hashLockTimestamp,
-        lnInvoice: lastTransaction.lnInvoice,
-      });
     }
   }, [data]);
 
-  const addTransaction = (transaction: HistoricalTransaction) => {
-    // check that amounts is non-zero
+  const addTransaction = async (transaction: HistoricalTransaction) => {
+    console.log("Adding transaction:", transaction);
+
+    // Ensure the date is correctly formatted and valid
+    let validDate;
+    try {
+      validDate = new Date(transaction.date);
+      if (isNaN(validDate.getTime())) {
+        throw new Error("Invalid date");
+      }
+    } catch (error) {
+      console.error("Invalid date format:", error);
+      return;
+    }
+
+    // Check that amounts are non-zero
     if (transaction.amount === 0) return;
-    // check if the transaction is already in the list then replace
+
+    // Check if the transaction is already in the list then replace
     let index = transactionRef.current.findIndex(t => t.txHash === transaction.txHash);
 
     if (index === -1) {
       index = transactionRef.current.findIndex(t => t.contractId === transaction.contractId);
     }
 
-    if (index !== -1) {
-      const newTransactions = [...transactionRef.current];
-      newTransactions[index] = transaction;
-      setTransactions(newTransactions);
-      return;
-    }
+    const updatedTransactions = [...transactionRef.current];
+    const updatedTransaction = {
+      ...transaction,
+      date: validDate.toISOString(), // Ensure date is saved correctly
+    };
 
-    setTransactions([transaction, ...transactionRef.current]);
+    if (index !== -1) {
+      console.log("Updating existing transaction:", updatedTransaction);
+      updatedTransactions[index] = updatedTransaction;
+    } else {
+      console.log("Adding new transaction:", updatedTransaction);
+      updatedTransactions.unshift(updatedTransaction);
+    }
+    setTransactions(updatedTransactions);
+
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedTransaction), // Ensure date and hashLockTimestamp are correctly formatted
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save transaction");
+      }
+      const result = await response.json();
+      console.log("Transaction saved:", result);
+
+      // Set the dbUpdated flag to true
+      setDbUpdated(true);
+    } catch (error) {
+      console.error("Error saving transaction:", error);
+    }
   };
 
   return (
