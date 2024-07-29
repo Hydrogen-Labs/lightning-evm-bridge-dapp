@@ -111,10 +111,10 @@ export const HistoryTable = () => {
     <div className="flex justify-center mt-16">
       <div className="flex justify-center mx-0 w-full w-[80%] md:w-[100%] flex-col">
         <h2 className="text-center text-xl font-black">HISTORY</h2>
-        <div className="mb-0 lg:mb-0 h-[auto] md:h-[750px] lg:h-[auto]" style={{ overflowY: "scroll" }}>
+        <div className="mb-0 lg:mb-0 overflow-auto max-h-96">
           <table className="table border-spacing-y-4 mb-0 mt-0 p-0 border-0">
             <thead
-              className="border-0 w-full m-0 p-0"
+              className="border-0 w-full m-0 p-0 bg-neutral z-10"
               style={{
                 position: "sticky",
                 top: "0",
@@ -123,17 +123,17 @@ export const HistoryTable = () => {
                 // zIndex: "9999",
               }}
             >
-              <tr className="text-sm text-white font-extrabold">
-                <th className="text-left" style={{ width: "10%" }}>
+              <tr className="text-sm font-extrabold border-0">
+                <th className="text-left" style={{ width: "15%" }}>
                   TYPE
                 </th>
-                <th className="text-left" style={{ width: "20%" }}>
+                <th className="text-left" style={{ width: "15%" }}>
                   STATUS
                 </th>
-                <th className="text-left" style={{ width: "50%" }}>
+                <th className="text-left" style={{ width: "40%" }}>
                   DATE
                 </th>
-                <th className="text-right" style={{ width: "20%" }}>
+                <th className="text-right" style={{ width: "30%" }}>
                   AMOUNT
                 </th>
               </tr>
@@ -141,20 +141,24 @@ export const HistoryTable = () => {
             <tbody>
               {transactions.length > 0 ? (
                 transactions.map((transaction, index) => (
-                  <>
+                  <React.Fragment key={index}>
                     <tr
-                      key={index}
-                      className={`${transaction.status === "failed" ? "bg-red-500" : ""}`}
-                      // style={{
-                      //   backgroundColor: index % 2 === 0 ? "rgba(32, 32, 32, 0.8)" : "rgba(32, 32, 32, 1)",
-                      // }}
+                      key={transaction.txHash}
+                      style={{
+                        backgroundColor:
+                          transaction.status === "failed"
+                            ? "rgb(248, 113, 113)"
+                            : index % 2 === 0
+                            ? "transparent"
+                            : "rgba(32, 32, 32, 0.75)",
+                      }}
                     >
-                      <td className="text-left text-white" style={{ width: "10%" }}>
+                      <td className="text-left text-white" style={{ width: "15%" }}>
                         {transaction.transactionType}
                       </td>
                       <td
                         className="text-left table-cell text-white uppercase tooltip flex items-center cursor-pointer"
-                        style={{ width: "20%" }}
+                        style={{ width: "15%" }}
                         data-tip={getTooltipText(transaction)}
                         onClick={account ? () => toggleRow(index) : undefined}
                       >
@@ -166,86 +170,107 @@ export const HistoryTable = () => {
                           </svg>
                         </div>
                       </td>
-                      <td className="text-left table-cell text-white" style={{ width: "60%" }}>
+                      <td className="text-left table-cell text-white" style={{ width: "40%" }}>
                         {new Date(transaction.date).toLocaleString()}
                       </td>
-                      <td className="text-right hidden lg:table-cell text-white" style={{ width: "25%" }}>
+                      <td className="text-right table-cell text-white" style={{ width: "30%" }}>
                         {transaction.amount} sats
                       </td>
                     </tr>
                     {expandedRow === index && (
-                      <tr>
+                      <tr key={transaction.contractId}>
                         <td colSpan={4}>
-                          <div className="p-2">
-                            TimeLock expiry: {new Date(transaction.hashLockTimestamp * 1000).toLocaleString()}
-                            <br />
-                            <br />
-                            <button
-                              className="btn btn-neutral text-white text-xs p-2"
-                              onClick={() => {
-                                navigator.clipboard.writeText(transaction.txHash);
-                                console.log("Transaction hash copied to clipboard");
-                              }}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.5}
-                                stroke="currentColor"
-                                className="w-6 h-6"
+                          <div className="p-2 relative">
+                            <div className="flex justify-between items-center">
+                              {transaction.transactionType === "SENT" && transaction.status === "failed" && (
+                                <div>
+                                  TimeLock expiry: {new Date(transaction.hashLockTimestamp * 1000).toLocaleString()}
+                                </div>
+                              )}
+                              <button
+                                className="btn-neutral absolute right-0 top-1 btn btn-circle btn-sm"
+                                onClick={() => toggleRow(null)}
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5A3.375 3.375 0 0 0 6.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0 0 15 2.25h-1.5a2.251 2.251 0 0 0-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 0 0-9-9Z"
-                                />
-                              </svg>
-                            </button>
-                            &nbsp; txHash: {transaction.txHash.substring(0, 20)}...
-                            <br />
-                            <br />
-                            <button
-                              className="btn btn-neutral text-white text-xs p-2"
-                              onClick={() => {
-                                navigator.clipboard.writeText(transaction.contractId);
-                                console.log("Contract ID copied to clipboard");
-                              }}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.5}
-                                stroke="currentColor"
-                                className="w-6 h-6"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5A3.375 3.375 0 0 0 6.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0 0 15 2.25h-1.5a2.251 2.251 0 0 0-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 0 0-9-9Z"
-                                />
-                              </svg>
-                            </button>
-                            &nbsp; contractId: {transaction.contractId.substring(0, 16)}...
-                          </div>
-                          {transactions[index].status === "failed" &&
-                            transactions[index].hashLockTimestamp < Date.now() / 1000 && (
+                                X
+                              </button>
+                            </div>
+                            {transaction.transactionType === "SENT" && <br />}
+                            <div className="flex justify-start items-center">
                               <button
                                 className="btn btn-neutral text-white text-xs p-2"
-                                onClick={account ? () => initiateRefund(index) : undefined}
+                                onClick={() => {
+                                  navigator.clipboard.writeText(transaction.txHash);
+                                  console.log("Transaction hash copied to clipboard");
+                                }}
                               >
-                                Initiate Refund
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  strokeWidth={1.5}
+                                  stroke="currentColor"
+                                  className="w-6 h-6"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5A3.375 3.375 0 0 0 6.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0 0 15 2.25h-1.5a2.251 2.251 0 0 0-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 0 0-9-9Z"
+                                  />
+                                </svg>
                               </button>
+                              &nbsp; Transaction Hash: {transaction.txHash.substring(0, 20)}...
+                            </div>
+                            <br />
+                            <div className="flex justify-start items-center">
+                              <button
+                                className="btn btn-neutral text-white text-xs p-2"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(transaction.contractId);
+                                  console.log("Contract ID copied to clipboard");
+                                }}
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  strokeWidth={1.5}
+                                  stroke="currentColor"
+                                  className="w-6 h-6"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5A3.375 3.375 0 0 0 6.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0 0 15 2.25h-1.5a2.251 2.251 0 0 0-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 0 0-9-9Z"
+                                  />
+                                </svg>
+                              </button>
+                              &nbsp; Contract ID: {transaction.contractId.substring(0, 16)}...
+                            </div>
+                            <br />
+                            {transaction.transactionType === "SENT" && transaction.status === "failed" && (
+                              <div className="flex justify-between items-center">
+                                <button
+                                  className={`btn btn-sm ${
+                                    transactions[index].status === "failed" &&
+                                    transactions[index].hashLockTimestamp < Date.now() / 1000
+                                      ? "btn-neutral"
+                                      : "btn-disabled cursor-not-allowed bg-red-500"
+                                  }`}
+                                  onClick={account ? () => initiateRefund(index) : undefined}
+                                  disabled={
+                                    transactions[index].status === "failed" &&
+                                    transactions[index].hashLockTimestamp < Date.now() / 1000
+                                  }
+                                >
+                                  Initiate Refund
+                                </button>
+                              </div>
                             )}
-
-                          <button className="btn btn-neutral text-white text-xs p-2" onClick={() => toggleRow(null)}>
-                            Close
-                          </button>
+                          </div>
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))
               ) : (
                 <tr>

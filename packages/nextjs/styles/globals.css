@@ -2,7 +2,6 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-
 :root,
 [data-theme] {
   background: oklch(var(--b2));
@@ -31,4 +30,28 @@ p {
 
 .btn.btn-ghost {
   @apply shadow-none;
+}
+
+/* For WebKit-based browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px; /* Set the width of the scrollbar */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent; /* Make the track background transparent */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555; /* Set the color of the scrollbar thumb */
+  border-radius: 4px; /* Optional: Rounded corners for the thumb */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333; /* Change the thumb color on hover */
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin; /* Make the scrollbar thinner */
+  scrollbar-color: #555 transparent; /* Set the thumb and track colors */
 }

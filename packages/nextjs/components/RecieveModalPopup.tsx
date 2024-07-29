@@ -69,17 +69,17 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
         console.log("Relay Response", msg);
 
         // Add transaction after successful relay
-        // addTransaction({
-        //   status: "relayed",
-        //   date: new Date().toISOString(),
-        //   amount: Number(amount),
-        //   txHash: msg.txHash,
-        //   contractId: recieveContractId,
-        //   hashLockTimestamp: hashLock?.hash || 0,
-        //   lnInvoice: lnInvoiceRef.current?.lnInvoice || "",
-        //   userAddress: recipientAddress,
-        //   transactionType: "RECEIVED",
-        // });
+        addTransaction({
+          status: "completed",
+          date: new Date().toISOString(),
+          amount: Number(amount),
+          txHash: msg.txHash,
+          contractId: recieveContractId,
+          hashLockTimestamp: lnInvoiceRef.current ? lnInvoiceRef.current.timeExpireDate : 0,
+          lnInvoice: lnInvoiceRef.current ? lnInvoiceRef.current.lnInvoice : "",
+          userAddress: recipientAddress,
+          transactionType: "RECEIVED",
+        });
       } else {
         toastError("Failed to relay contract and preimage");
       }
@@ -147,19 +147,6 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
         await waitForTransaction({ hash: txHash });
         setTxHash(txHash);
         setActiveStep(3);
-
-        // Add transaction after successful withdrawal
-        // addTransaction({
-        //   status: "completed",
-        //   date: new Date().toISOString(),
-        //   amount: Number(amount),
-        //   txHash: txHash,
-        //   contractId: recieveContractId,
-        //   hashLockTimestamp: hashLock?.hash || 0,
-        //   lnInvoice: lnInvoiceRef.current?.lnInvoice || "",
-        //   userAddress: recipientAddress,
-        //   transactionType: "RECEIVED",
-        // });
       } catch (error) {
         console.error("Failed to fetch contract details:", error);
         if (retries > 0) {

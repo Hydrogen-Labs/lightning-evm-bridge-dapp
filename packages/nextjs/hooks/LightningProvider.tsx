@@ -72,17 +72,6 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     hodlInvoiceResponse,
   } = useWebSocket(process.env.WEBSOCKET_URL ?? "ws://localhost:3003");
 
-  console.log("transactions 999", transactions);
-  console.log(
-    "data 999",
-    data,
-    isWebSocketConnected,
-    status,
-    lnInitationResponse,
-    hodlInvoiceResponse,
-    recieveContractId,
-  );
-
   const toastSuccess = (message: string) => {
     toast.success(message, {
       position: "top-center",
@@ -118,20 +107,6 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
         console.log("Transaction hash not found in existing transactions");
         return;
       }
-
-      // // Update the transaction with the new contractId
-      // const updatedTransaction = {
-      //   ...transactionRef.current[index],
-      //   contractId: tmpContractId,
-      // };
-
-      // console.log("Event received: CHECK THIS tmpContractId:", tmpContractId);
-      // console.log("Event received: Updating transaction with contractId:", updatedTransaction);
-
-      // // Update the transaction in the database
-      // addTransaction(updatedTransaction);
-
-      // console.log("Event received: CHECK THIS SECURED 999:", tmpContractId);
 
       sendMessage({
         contractId: tmpContractId,

@@ -49,7 +49,7 @@ export const Footer = () => {
               BTC ${formatBTC(nativeCurrencyPrice)}
             </span>
           </div>
-          <div className="flex justify-center m-5 text-xs text-white">
+          <div className="flex justify-center m-5 text-[0.5rem] md:text-xs text-white">
             © {currentYear} Hydrogen Labs, Inc. All rights reserved
           </div>
           <div className="hidden md:flex flex-row items-center justify-center">
