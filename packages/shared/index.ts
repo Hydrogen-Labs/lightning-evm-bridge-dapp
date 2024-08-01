@@ -118,3 +118,15 @@ export type ContractDetails = {
 	refunded: boolean;
 	preimage: string;
 };
+
+export type Transaction = {
+	status: 'PENDING' | 'FAILED' | 'COMPLETED' | 'REFUNDED' | 'RELAYED';
+	date: string;
+	amount: number;
+	txHash: string;
+	contractId: string;
+	hashLockTimestamp: number;
+	lnInvoice: string;
+	userAddress: string;
+	transactionType: 'RECEIVED' | 'SENT';
+};

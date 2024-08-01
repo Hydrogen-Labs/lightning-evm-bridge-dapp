@@ -9,6 +9,7 @@ import {
   KIND,
   RelayRequest,
   RelayResponse,
+  TxHashMessage,
   parseContractDetails,
 } from "@lightning-evm-bridge/shared";
 import { waitForTransaction } from "@wagmi/core";
@@ -37,7 +38,6 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     setHashLock,
     recieveContractId,
     addTransaction,
-    sendTxHash,
   } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
@@ -67,7 +67,13 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
       console.log("relay-server response", response);
       const msg: RelayResponse = response.data;
       if (msg.status === "success" && msg.txHash) {
-        sendTxHash(msg.txHash, msg.contractId);
+        // sendTxHash(msg.txHash, msg.contractId);
+        const txHashMessage: TxHashMessage = {
+          kind: KIND.TX_HASH,
+          txHash: msg.txHash,
+          contractId: msg.contractId,
+        };
+        sendMessage(txHashMessage);
         setActiveStep(3);
         setTxHash(msg.txHash);
         setDbUpdated(true);

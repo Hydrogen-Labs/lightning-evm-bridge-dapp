@@ -111,31 +111,8 @@ export const useWebSocket = (url: string) => {
     [isWebSocketConnected],
   );
 
-  // New function to send txHash and contractId
-  const sendTxHash = useCallback(
-    (txHash: string, contractId: string) => {
-      if (socket.current && isWebSocketConnected) {
-        // Create a structured message including the kind, txHash, and contractId
-        const message: TxHashMessage = {
-          kind: KIND.TX_HASH, // Use the enum value from KIND
-          txHash: txHash,
-          contractId: contractId, // Add contractId to the message
-        };
-
-        // Convert the message object to a JSON string
-        const messageString = JSON.stringify(message);
-        socket.current.send(messageString);
-        console.log("Sent txHash and contractId:", messageString);
-      } else {
-        console.error("WebSocket is not open");
-      }
-    },
-    [isWebSocketConnected],
-  );
-
   return {
     sendMessage,
-    sendTxHash,
     data,
     error,
     isWebSocketConnected,

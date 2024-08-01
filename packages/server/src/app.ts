@@ -10,9 +10,9 @@ import transactionsRouter from './routes/transactions';
 import { ClientRequest, ConnectionResponse, KIND, ServerStatus, deployedContracts } from '@lightning-evm-bridge/shared';
 import { authenticatedLndGrpc } from 'lightning';
 import { match } from 'ts-pattern';
-import prisma from './prismaClient';
 import { providerConfig } from './provider.config';
 import { CachedPayment, ServerState } from './types/types';
+import { handleTxHash } from './utils/handleTxHash';
 import { processClientLightningReceiveRequest } from './utils/lightningRecieveUtils';
 import { processClientInvoiceRequest } from './utils/lightningSendUtils';
 
@@ -90,23 +90,7 @@ wss.on('connection', (ws: WebSocket) => {
 				await processClientLightningReceiveRequest(request, ws, serverState);
 			})
 			.with({ kind: KIND.TX_HASH }, async (request) => {
-				console.log('Handling TX_HASH kind', request);
-				try {
-					// Ensure contractId is provided
-					if (!request.contractId) {
-						throw new Error('Contract ID missing for TX_HASH message');
-					}
-
-					// Update the record in the database where contractId matches
-					const updatedRecord = await prisma.transaction.update({
-						where: { contractId: request.contractId },
-						data: { txHash: request.txHash },
-					});
-
-					console.log('Updated record with txHash:', updatedRecord);
-				} catch (error) {
-					console.error('Error updating transaction with txHash:', error);
-				}
+				await handleTxHash(request);
 			})
 			.otherwise((request) => {
 				console.warn('Unknown message kind:', request.kind);

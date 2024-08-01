@@ -1,20 +1,9 @@
 import React, { useEffect, useState } from "react";
+import { Transaction } from "@lightning-evm-bridge/shared";
 import "react-toastify/dist/ReactToastify.css";
 import { useWalletClient } from "wagmi";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
 import { useGlobalState } from "~~/services/store/store";
-
-type Transaction = {
-  status: "PENDING" | "FAILED" | "COMPLETED" | "REFUNDED" | "RELAYED";
-  date: string;
-  amount: number;
-  txHash: string;
-  contractId: string;
-  hashLockTimestamp: number;
-  lnInvoice: string;
-  userAddress: string;
-  transactionType: "RECEIVED" | "SENT";
-};
 
 export const HistoryTable = () => {
   const { account, dbUpdated, setDbUpdated } = useGlobalState();
@@ -33,7 +22,7 @@ export const HistoryTable = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3002/api/transactions?userAddress=${account}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/transactions?userAddress=${account}`);
       const data: Transaction[] = await response.json();
       setTransactions(data);
     } catch (error) {
@@ -97,7 +86,7 @@ export const HistoryTable = () => {
         const updatedTransaction: Transaction = { ...transaction, status: "REFUNDED", date: new Date().toISOString() }; // Use ISO string
 
         // Notify the server about the refund transaction
-        fetch("http://localhost:3002/api/transactions/refund", {
+        fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/transactions/refund`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

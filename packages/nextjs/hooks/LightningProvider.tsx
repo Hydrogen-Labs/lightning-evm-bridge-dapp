@@ -31,7 +31,6 @@ export type LightningAppContextType = {
   transactions: HistoricalTransaction[];
   addTransaction: (transaction: HistoricalTransaction) => void;
   sendMessage: (message: ClientRequest) => void;
-  sendTxHash: (txHash: string, contractId: string) => void;
   reconnect: () => void;
   isWebSocketConnected: boolean;
   data: InvoiceResponse | null;
@@ -64,7 +63,6 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
   console.log(process.env.WEBSOCKET_URL ?? "ws://localhost:3003");
   const {
     sendMessage,
-    sendTxHash,
     isWebSocketConnected,
     data,
     reconnect,
@@ -234,7 +232,6 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
         data,
         addTransaction,
         sendMessage,
-        sendTxHash,
         isWebSocketConnected,
         price,
         reconnect,

@@ -7,8 +7,8 @@ export const sepoliaTestnet = {
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   testnet: true,
   rpcUrls: {
-    default: { http: [`https://sepolia.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_API_KEY}`] },
-    public: { http: [`https://sepolia.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_API_KEY}`] },
+    default: { http: [`${process.env.NEXT_PUBLIC_INFURA_API_KEY}`] },
+    public: { http: [`${process.env.NEXT_PUBLIC_INFURA_API_KEY}`] },
   },
   blockExplorers: {
     default: { name: "Etherscan", url: "https://sepolia.etherscan.io" },
