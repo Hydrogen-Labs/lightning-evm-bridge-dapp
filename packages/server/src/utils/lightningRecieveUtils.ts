@@ -5,10 +5,13 @@ import {
 	InitiationRequest,
 	InitiationResponse,
 	KIND,
+	RelayResponse,
 } from '@lightning-evm-bridge/shared';
+import { TransactionStatus, TransactionType } from '@prisma/client';
 import { ethers } from 'ethers';
 import { cancelHodlInvoice, createHodlInvoice, createInvoice, settleHodlInvoice, subscribeToInvoice } from 'lightning';
 import * as WebSocket from 'ws';
+import prisma from '../prismaClient';
 import { providerConfig } from '../provider.config';
 import { ServerState } from '../types/types';
 import { getContractDetails } from './validation';
@@ -45,7 +48,7 @@ export async function processClientLightningReceiveRequest(request: InitiationRe
 		});
 
 		sub.on('invoice_updated', (invoice) => {
-			handleSetupInvoiceUpdate(invoice, ws, sub, request, serverState);
+			handleSetupInvoiceUpdate(invoice, ws, sub, request, serverState, initiationResponse);
 		});
 		console.log('Subscribed to invoice updates');
 	} catch (error) {
@@ -59,7 +62,14 @@ export async function processClientLightningReceiveRequest(request: InitiationRe
 
 // Step 2: After the initiation invoice is paid
 // a hodl invoice with the client's hashlock is created
-async function handleSetupInvoiceUpdate(invoice: any, ws: WebSocket, sub: any, request: InitiationRequest, serverState: ServerState) {
+async function handleSetupInvoiceUpdate(
+	invoice: any,
+	ws: WebSocket,
+	sub: any,
+	request: InitiationRequest,
+	serverState: ServerState,
+	initiationResponse: InitiationResponse
+) {
 	if (!invoice.is_confirmed) return;
 
 	sub.removeAllListeners();
@@ -80,7 +90,7 @@ async function handleSetupInvoiceUpdate(invoice: any, ws: WebSocket, sub: any, r
 
 		sendWebSocketMessage(ws, hodlInvoiceResponse);
 
-		subscribeToHodlInvoice(hodlInvoice.id, request, serverState, ws, expiryTime);
+		subscribeToHodlInvoice(hodlInvoice.id, request, serverState, ws, expiryTime, initiationResponse);
 	} catch (error) {
 		logError('Creating Hodl Invoice', error);
 		sendWebSocketMessage(ws, {
@@ -90,7 +100,14 @@ async function handleSetupInvoiceUpdate(invoice: any, ws: WebSocket, sub: any, r
 	}
 }
 
-function subscribeToHodlInvoice(invoiceId: string, request: InitiationRequest, serverState: ServerState, ws: WebSocket, expiryTime: number) {
+function subscribeToHodlInvoice(
+	invoiceId: string,
+	request: InitiationRequest,
+	serverState: ServerState,
+	ws: WebSocket,
+	expiryTime: number,
+	initiationResponse: InitiationResponse
+) {
 	const sub = subscribeToInvoice({
 		lnd: serverState.lnd,
 		id: invoiceId,
@@ -98,7 +115,7 @@ function subscribeToHodlInvoice(invoiceId: string, request: InitiationRequest, s
 
 	sub.on('invoice_updated', (invoice) => {
 		if (invoice.is_held) {
-			processPaidHodlInvoice(request, serverState, expiryTime, invoiceId, ws);
+			processPaidHodlInvoice(request, serverState, expiryTime, invoiceId, ws, initiationResponse);
 			sub.removeAllListeners();
 		}
 	});
@@ -107,7 +124,14 @@ function subscribeToHodlInvoice(invoiceId: string, request: InitiationRequest, s
 // Step 3: User pays the hodl invoice to claim the contract
 // Once the hodl invoice is paid, scan the blockchain for the preimage
 // settle the invoice via the lnd api
-async function processPaidHodlInvoice(request: InitiationRequest, serverState: ServerState, expiryTime: number, id: string, ws: WebSocket) {
+async function processPaidHodlInvoice(
+	request: InitiationRequest,
+	serverState: ServerState,
+	expiryTime: number,
+	id: string,
+	ws: WebSocket,
+	initiationResponse: InitiationResponse
+) {
 	const options = {
 		// gasPrice: ethers.parseUnits("0.001", "gwei"),
 		value: BigInt(request.amount * GWEIPERSAT),
@@ -144,6 +168,7 @@ async function processPaidHodlInvoice(request: InitiationRequest, serverState: S
 
 	while (true && contractId) {
 		console.log('Checking hodl invoice status');
+
 		try {
 			const now = Math.floor(Date.now() / 1000);
 			if (now > expiryTime) {
@@ -166,6 +191,27 @@ async function processPaidHodlInvoice(request: InitiationRequest, serverState: S
 					lnd: serverState.lnd,
 					secret: contractDetails.preimage.substring(2),
 				});
+
+				try {
+					const transactionData = {
+						status: TransactionStatus.COMPLETED,
+						date: new Date().toISOString(),
+						amount: Number(contractDetails.amount),
+						txHash: '',
+						contractId: contractId,
+						hashLockTimestamp: 0,
+						lnInvoice: initiationResponse.lnInvoice,
+						userAddress: contractDetails.receiver,
+						transactionType: TransactionType.RECEIVED,
+					};
+
+					// Save transaction to the database
+					await prisma.transaction.create({
+						data: transactionData,
+					});
+				} catch (error) {
+					console.error('Error creating new transaction:', error);
+				}
 
 				return;
 			}

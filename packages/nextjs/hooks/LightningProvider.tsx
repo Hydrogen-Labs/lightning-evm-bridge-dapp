@@ -16,7 +16,7 @@ import { HashLock } from "~~/types/utils";
 
 // Define the types for your historical transactions and context
 export type HistoricalTransaction = {
-  status: "pending" | "failed" | "completed" | "refunded" | "relayed";
+  status: "PENDING" | "FAILED" | "COMPLETED" | "REFUNDED" | "RELAYED";
   date: string;
   amount: number;
   contractId: string;
@@ -31,6 +31,7 @@ export type LightningAppContextType = {
   transactions: HistoricalTransaction[];
   addTransaction: (transaction: HistoricalTransaction) => void;
   sendMessage: (message: ClientRequest) => void;
+  sendTxHash: (txHash: string, contractId: string) => void;
   reconnect: () => void;
   isWebSocketConnected: boolean;
   data: InvoiceResponse | null;
@@ -63,6 +64,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
   console.log(process.env.WEBSOCKET_URL ?? "ws://localhost:3003");
   const {
     sendMessage,
+    sendTxHash,
     isWebSocketConnected,
     data,
     reconnect,
@@ -112,6 +114,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
         contractId: tmpContractId,
         kind: KIND.INVOICE_SEND,
         lnInvoice: transactionRef.current[index]?.lnInvoice,
+        txHash: txHash,
       });
 
       setInvoiceContractIdPair([tmpContractId, transactionRef.current[index]?.lnInvoice]);
@@ -124,7 +127,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     if (lastTransaction === undefined) return;
     const [contractId, lnInvoice] = invoiceContractIdPair;
     addTransaction({
-      status: "pending",
+      status: "PENDING",
       date: lastTransaction.date,
       amount: lastTransaction.amount,
       txHash: lastTransaction.txHash,
@@ -143,10 +146,15 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
 
     const updatedTransaction: HistoricalTransaction = {
       ...lastTransaction,
-      status: data?.status === "success" ? "completed" : ("failed" as "completed" | "failed"),
+      status: data?.status === "success" ? "COMPLETED" : ("FAILED" as "COMPLETED" | "FAILED"),
     };
 
     addTransaction(updatedTransaction);
+
+    if (data?.status === "pending") {
+      setDbUpdated(true);
+      toastSuccess("Payment pending");
+    }
 
     if (data?.status === "success") {
       toastSuccess("Payment successful");
@@ -194,27 +202,29 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
       updatedTransactions.unshift(updatedTransaction);
     }
     setTransactions(updatedTransactions);
+    setDbUpdated(true);
 
-    try {
-      const response = await fetch("/api/transactions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedTransaction), // Ensure date and hashLockTimestamp are correctly formatted
-      });
+    // try {
+    //   console.log("Saving transaction to server:", updatedTransaction);
+    //   const response = await fetch("http://localhost:3002/api/transactions/process", {
+    //     method: "POST",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //     },
+    //     body: JSON.stringify(updatedTransaction),
+    //   });
 
-      if (!response.ok) {
-        throw new Error("Failed to save transaction");
-      }
-      const result = await response.json();
-      console.log("Transaction saved:", result);
+    //   if (!response.ok) {
+    //     throw new Error("Failed to save transaction");
+    //   }
+    //   const result = await response.json();
+    //   console.log("Transaction saved:", result);
 
-      // Set the dbUpdated flag to true
-      setDbUpdated(true);
-    } catch (error) {
-      console.error("Error saving transaction:", error);
-    }
+    //   // Set the dbUpdated flag to true
+    //   setDbUpdated(true);
+    // } catch (error) {
+    //   console.error("Error saving transaction:", error);
+    // }
   };
 
   return (
@@ -224,6 +234,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
         data,
         addTransaction,
         sendMessage,
+        sendTxHash,
         isWebSocketConnected,
         price,
         reconnect,

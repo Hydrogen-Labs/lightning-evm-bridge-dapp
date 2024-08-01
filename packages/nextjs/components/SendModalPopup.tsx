@@ -36,14 +36,14 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
     if (transactions.length === 0) return;
     const lastTransaction = transactions[0];
     if (lastTransaction.lnInvoice !== lnInvoiceRef.current?.lnInvoice) return;
-    if (lastTransaction.status === "pending" && lastTransaction.contractId) {
+    if (lastTransaction.status === "PENDING" && lastTransaction.contractId) {
       setActiveStep(3);
     }
-    if (lastTransaction.status === "completed") {
+    if (lastTransaction.status === "COMPLETED") {
       setActiveStep(4);
       cleanAndClose();
     }
-    if (lastTransaction.status === "failed") {
+    if (lastTransaction.status === "FAILED") {
       setActiveStep(4);
       cleanAndClose();
     }
@@ -97,7 +97,7 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
       .then(tx => {
         console.log("txHash", tx);
         addTransaction({
-          status: "pending",
+          status: "PENDING",
           date: new Date().toISOString(), // Use ISO string for consistency
           amount: lnInvoiceRef.current ? lnInvoiceRef.current.satoshis : 0,
           txHash: tx,

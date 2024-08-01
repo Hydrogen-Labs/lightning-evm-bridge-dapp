@@ -47,6 +47,7 @@ app.post('/relay', async (req: Request, res: Response) => {
 								kind: KIND.RELAY_RESPONSE,
 								status: 'success',
 								txHash: tx.hash,
+								contractId: contractId,
 							};
 							// Insert your logic here to interact with the smart contract
 							res.status(200).send(msg);

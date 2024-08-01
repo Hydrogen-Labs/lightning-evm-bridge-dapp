@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useWalletClient } from "wagmi";
-import { useLightningApp } from "~~/hooks/LightningProvider";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
 import { useGlobalState } from "~~/services/store/store";
 
 type Transaction = {
-  status: "pending" | "failed" | "completed" | "refunded" | "relayed"; // Update this type to match HistoricalTransaction
+  status: "PENDING" | "FAILED" | "COMPLETED" | "REFUNDED" | "RELAYED";
   date: string;
   amount: number;
   txHash: string;
@@ -26,7 +25,6 @@ export const HistoryTable = () => {
     contractName: "HashedTimelock",
     walletClient,
   });
-  const { addTransaction } = useLightningApp(); // Get addTransaction from context
 
   const fetchTransactions = async () => {
     if (!account) {
@@ -35,7 +33,7 @@ export const HistoryTable = () => {
     }
 
     try {
-      const response = await fetch(`/api/transactions?userAddress=${account}`);
+      const response = await fetch(`http://localhost:3002/api/transactions?userAddress=${account}`);
       const data: Transaction[] = await response.json();
       setTransactions(data);
     } catch (error) {
@@ -66,20 +64,20 @@ export const HistoryTable = () => {
 
   // refund transaction if status is failed
   const initiateRefund = (index: number) => {
-    if (transactions[index].status === "failed") {
+    if (transactions[index].status === "FAILED") {
       refund(transactions[index]);
     }
   };
 
   function getTooltipText(transaction: Transaction) {
     switch (transaction.status) {
-      case "pending":
+      case "PENDING":
         return "Waiting for the transaction to be included in a block";
-      case "completed":
+      case "COMPLETED":
         return "Expand for more details";
-      case "failed":
+      case "FAILED":
         return `Transaction failed: Redeemable at ${new Date(transaction.hashLockTimestamp * 1000).toLocaleString()}`;
-      case "refunded":
+      case "REFUNDED":
         return "Transaction refunded";
       default:
         return "";
@@ -96,11 +94,23 @@ export const HistoryTable = () => {
       .refund([transaction.contractId as `0x${string}`], {})
       .then(tx => {
         console.log(tx);
-        const updatedTransaction: Transaction = { ...transaction, status: "refunded", date: new Date().toISOString() }; // Use ISO string
+        const updatedTransaction: Transaction = { ...transaction, status: "REFUNDED", date: new Date().toISOString() }; // Use ISO string
+
+        // Notify the server about the refund transaction
+        fetch("http://localhost:3002/api/transactions/refund", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ transactionId: transaction.contractId, txHash: tx }),
+        })
+          .then(response => response.json())
+          .then(data => console.log("Server updated:", data))
+          .catch(error => console.error("Error updating server:", error));
+
         setTransactions(prevTransactions =>
           prevTransactions.map(t => (t.txHash === transaction.txHash ? updatedTransaction : t)),
         );
-        addTransaction(updatedTransaction); // Call addTransaction to update the database
       })
       .catch(e => {
         console.error(e);
@@ -146,7 +156,7 @@ export const HistoryTable = () => {
                       key={transaction.txHash}
                       style={{
                         backgroundColor:
-                          transaction.status === "failed"
+                          transaction.status === "FAILED"
                             ? "rgb(248, 113, 113)"
                             : index % 2 === 0
                             ? "transparent"
@@ -182,7 +192,7 @@ export const HistoryTable = () => {
                         <td colSpan={4}>
                           <div className="p-2 relative">
                             <div className="flex justify-between items-center">
-                              {transaction.transactionType === "SENT" && transaction.status === "failed" && (
+                              {transaction.transactionType === "SENT" && transaction.status === "FAILED" && (
                                 <div>
                                   TimeLock expiry: {new Date(transaction.hashLockTimestamp * 1000).toLocaleString()}
                                 </div>
@@ -247,18 +257,18 @@ export const HistoryTable = () => {
                               &nbsp; Contract ID: {transaction.contractId.substring(0, 16)}...
                             </div>
                             <br />
-                            {transaction.transactionType === "SENT" && transaction.status === "failed" && (
+                            {transaction.transactionType === "SENT" && transaction.status === "FAILED" && (
                               <div className="flex justify-between items-center">
                                 <button
                                   className={`btn btn-sm ${
-                                    transactions[index].status === "failed" &&
+                                    transactions[index].status === "FAILED" &&
                                     transactions[index].hashLockTimestamp < Date.now() / 1000
                                       ? "btn-neutral"
                                       : "btn-disabled cursor-not-allowed bg-red-500"
                                   }`}
                                   onClick={account ? () => initiateRefund(index) : undefined}
                                   disabled={
-                                    transactions[index].status === "failed" &&
+                                    transactions[index].status === "FAILED" &&
                                     transactions[index].hashLockTimestamp < Date.now() / 1000
                                   }
                                 >

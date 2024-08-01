@@ -18,6 +18,7 @@ import { sha256 } from "js-sha256";
 import { useWalletClient } from "wagmi";
 import { useLightningApp } from "~~/hooks/LightningProvider";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { useGlobalState } from "~~/services/store/store";
 import { LnPaymentInvoice } from "~~/types/utils";
 
 type RecieveModalProps = {
@@ -36,12 +37,14 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     setHashLock,
     recieveContractId,
     addTransaction,
+    sendTxHash,
   } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [amount, setAmount] = useState<bigint>(BigInt(0));
   const lnInvoiceRef = useRef<LnPaymentInvoice | null>(null);
   const [txHash, setTxHash] = useState<string>("");
+  const { setDbUpdated } = useGlobalState();
 
   const { data: walletClient } = useWalletClient();
   function cleanAndClose() {
@@ -61,25 +64,13 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     };
 
     axios.post("http://localhost:3004/relay", msg).then(response => {
-      console.log(response);
+      console.log("relay-server response", response);
       const msg: RelayResponse = response.data;
       if (msg.status === "success" && msg.txHash) {
+        sendTxHash(msg.txHash, msg.contractId);
         setActiveStep(3);
         setTxHash(msg.txHash);
-        console.log("Relay Response", msg);
-
-        // Add transaction after successful relay
-        addTransaction({
-          status: "completed",
-          date: new Date().toISOString(),
-          amount: Number(amount),
-          txHash: msg.txHash,
-          contractId: recieveContractId,
-          hashLockTimestamp: lnInvoiceRef.current ? lnInvoiceRef.current.timeExpireDate : 0,
-          lnInvoice: lnInvoiceRef.current ? lnInvoiceRef.current.lnInvoice : "",
-          userAddress: recipientAddress,
-          transactionType: "RECEIVED",
-        });
+        setDbUpdated(true);
       } else {
         toastError("Failed to relay contract and preimage");
       }
@@ -103,12 +94,12 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     if (recieveContractId === "") {
       return;
     }
-
     const retryDelay = 5000; // Delay time in milliseconds
     const maxRetries = 3; // Maximum number of retries
 
     const fetchContractDetails = async (retries = maxRetries) => {
       relayContractAndPreimage();
+      //**TODO this is not used?! */
       if (retryDelay > 0) {
         return;
       }
@@ -140,6 +131,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
 
         const secret = `0x${hashLock.secret}`;
         console.log("Withdrawing contract", recieveContractId, secret);
+
         const txHash = await htlcContract.write.withdraw([
           `${recieveContractId}` as `0x${string}`,
           secret as `0x${string}`,
@@ -156,6 +148,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
           toastError("Failed to process contract after several attempts.");
         }
       }
+      //**TODO this is not used?! */
     };
 
     setTimeout(() => {

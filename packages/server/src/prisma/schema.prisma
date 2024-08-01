@@ -12,13 +12,21 @@ enum TransactionType {
   SENT
 }
 
+enum TransactionStatus {
+  PENDING
+  FAILED
+  COMPLETED
+  REFUNDED
+  RELAYED
+}
+
 model Transaction {
   id                Int              @id @default(autoincrement())
-  status            String
+  status            TransactionStatus
   date              DateTime
   amount            Int
-  txHash            String
-  contractId        String
+  txHash            String            
+  contractId        String            @unique
   hashLockTimestamp Int
   lnInvoice         String
   userAddress       String

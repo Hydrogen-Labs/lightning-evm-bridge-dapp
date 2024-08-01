@@ -1,8 +1,10 @@
 import { ContractDetails, InvoiceRequest } from '@lightning-evm-bridge/shared';
+import { TransactionStatus, TransactionType } from '@prisma/client';
 import { decode } from 'bolt11';
 import { ethers } from 'ethers';
 import { pay } from 'lightning';
 import * as WebSocket from 'ws';
+import prisma from '../prismaClient';
 import { providerConfig } from '../provider.config';
 import { ServerState } from '../types/types';
 import { getContractDetails, validateLnInvoiceAndContract } from './validation';
@@ -82,6 +84,33 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 			return;
 		}
 
+		const transactionData = {
+			status: TransactionStatus.PENDING,
+			date: new Date().toISOString(),
+			amount: lnInvoiceDetails.satoshis,
+			txHash: request.txHash,
+			contractId: request.contractId,
+			hashLockTimestamp: lnInvoiceDetails.timeExpireDate,
+			lnInvoice: lnInvoiceDetails.paymentRequest,
+			userAddress: contractDetails.sender,
+			transactionType: TransactionType.SENT,
+		};
+
+		// Save transaction to the database
+		await prisma.transaction.create({
+			data: transactionData,
+		});
+
+		ws.send(
+			JSON.stringify({
+				status: 'pending',
+				message: 'Invoice pending.',
+			})
+		);
+
+		// Simulate processing delay
+		// await new Promise((resolve) => setTimeout(resolve, 10000)); // 10 second delay for testing purposes
+
 		console.log('Invoice and Contract are valid, proceeding with payment');
 		const paymentResponse = await pay({
 			lnd: serverState.lnd,
@@ -90,6 +119,35 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 		});
 
 		console.log('Payment Response:', paymentResponse);
+		if (paymentResponse) {
+			try {
+				// Update the existing transaction in the database
+				await prisma.transaction.update({
+					where: { contractId: request.contractId },
+					data: {
+						status: TransactionStatus.COMPLETED,
+						date: new Date().toISOString(),
+					},
+				});
+			} catch (error) {
+				console.error('Error updating transaction to COMPLETED:', error);
+			}
+		} else {
+			try {
+				// Update the transaction to FAILED status
+				await prisma.transaction.update({
+					where: { contractId: request.contractId },
+					data: {
+						status: TransactionStatus.FAILED,
+						date: new Date().toISOString(),
+					},
+				});
+				console.log('Payment failed, transaction status updated to FAILED.');
+			} catch (error) {
+				console.error('Error updating transaction to FAILED:', error);
+			}
+		}
+
 		ws.send(
 			JSON.stringify({
 				status: 'success',
