@@ -7,6 +7,7 @@ import {
   KIND,
   ServerResponse,
   ServerStatus,
+  TxHashMessage,
 } from "@lightning-evm-bridge/shared";
 
 export const useWebSocket = (url: string) => {

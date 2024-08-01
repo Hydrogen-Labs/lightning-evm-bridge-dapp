@@ -1,43 +1,64 @@
 import React from "react";
-import Link from "next/link";
-import { hardhat } from "viem/chains";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { Faucet } from "~~/components/scaffold-eth";
-import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
+import Globe from "/public/svg/socials/globe.svg";
+import Twitter from "/public/svg/socials/x.svg";
 import { useGlobalState } from "~~/services/store/store";
 
-/**
- * Site footer
- */
 export const Footer = () => {
-  const nativeCurrencyPrice = useGlobalState(state => state.nativeCurrencyPrice);
-  const { targetNetwork } = useTargetNetwork();
-  const isLocalNetwork = targetNetwork.id === hardhat.id;
+  const { nativeCurrencyPrice } = useGlobalState();
+
+  function formatBTC(value: number) {
+    return Number(value).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  // get the current year
+  const currentYear = new Date().getFullYear();
 
   return (
-    <div className="min-h-0 py-5 px-1 mb-11 lg:mb-0 font-mono">
-      <div>
-        <div className="fixed flex justify-between items-center w-full z-10 p-4 bottom-0 left-0 pointer-events-none">
-          <div className="flex flex-col md:flex-row gap-2 pointer-events-auto">
-            {nativeCurrencyPrice > 0 && (
-              <div>
-                <button className="btn btn-neutral">
-                  <span>${nativeCurrencyPrice.toLocaleString()}</span>
-                </button>
+    <>
+      <div className="w-full bg-transparent flex flex-col">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center w-full px-10 pt-10">
+          <div className="flex flex-col md:flex-row gap-5 items-center mt-12 md:mt-0">
+            <div className="flex flex-row gap-5 mt-6 md:mt-0 ">
+              <div className="w-6 h-6 flex justify-center">
+                <a
+                  href="https://hydrogenlabs.xyz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="fill-neutral-content hover:fill-warning flex justify-center items-center"
+                >
+                  <Globe style={{ width: "20px", height: "20px" }} />
+                </a>
               </div>
-            )}
-            {isLocalNetwork && (
-              <>
-                <Faucet />
-                <Link href="/blockexplorer" passHref className="btn btn-primary btn-sm font-normal gap-1">
-                  <MagnifyingGlassIcon className="h-4 w-4" />
-                  <span>Block Explorer</span>
-                </Link>
-              </>
-            )}
+              <div className="w-6 h-6 flex justify-center">
+                <a
+                  href="https://x.com/RoverStaking"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="fill-neutral-content hover:fill-warning flex justify-center items-center"
+                >
+                  <Twitter style={{ width: "20px", hight: "20px" }} />
+                </a>
+              </div>
+            </div>
+          </div>
+          <div className="flex md:hidden mt-5 flex-row items-center justify-center">
+            <span className="text-base text-white font-black cursor-default">
+              BTC ${formatBTC(nativeCurrencyPrice)}
+            </span>
+          </div>
+          <div className="flex justify-center m-5 text-[0.5rem] md:text-xs text-white">
+            © {currentYear} Hydrogen Labs, Inc. All rights reserved
+          </div>
+          <div className="hidden md:flex flex-row items-center justify-center">
+            <span className="text-base text-white font-black cursor-default">
+              BTC ${formatBTC(nativeCurrencyPrice)}
+            </span>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

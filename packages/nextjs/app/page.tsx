@@ -8,10 +8,13 @@ import { useAccount } from "wagmi";
 import { HistoryTable } from "~~/components/HistoryTable";
 import RecieveModal from "~~/components/RecieveModalPopup";
 import SendModalPopup from "~~/components/SendModalPopup";
+import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useLightningApp } from "~~/hooks/LightningProvider";
 import { useAccountBalance } from "~~/hooks/scaffold-eth";
+import { useGlobalState } from "~~/services/store/store";
 
 const Home = () => {
+  const { account } = useGlobalState();
   const { address } = useAccount();
   const { balance } = useAccountBalance(address);
   const { isWebSocketConnected, price } = useLightningApp();
@@ -40,15 +43,22 @@ const Home = () => {
     <>
       <div className="bg-oval-gradient justify-center absolute bg-gradient-to-r from-yellow-400 to-violet-800 opacity-25" />
       <div className="font-plex container mx-auto flex h-[95%] items-center justify-center">
-        <div className="card w-[500px] ">
-          <div className="card-header text-white p-4">
-            <h1
-              className="cursor-pointer text-center text-3xl font-mono mt-10"
-              onClick={() => setBalanceVisibility((balanceVisibility + 1) % 3)}
-            >
-              {getBalanceWithVisibility()}
-            </h1>
-          </div>
+        <div className="card w-[750px] ">
+          {account ? (
+            <div className="card-header text-white p-4">
+              <h1 className="cursor-default text-center text-3xl font-mono mt-10">Balance</h1>
+              <h1
+                className="cursor-pointer text-center text-3xl font-mono"
+                onClick={() => setBalanceVisibility((balanceVisibility + 1) % 3)}
+              >
+                {getBalanceWithVisibility()}
+              </h1>
+            </div>
+          ) : (
+            <div className="card-header text-center text-white p-4">
+              <RainbowKitCustomConnectButton />
+            </div>
+          )}
           <div className="card-footer p-4 flex justify-between items-center font-mono">
             <div className="join w-full">
               <button

@@ -7,6 +7,7 @@ import { useWalletClient } from "wagmi";
 import { PaymentInvoice } from "~~/components/PaymentInvoice";
 import { useLightningApp } from "~~/hooks/LightningProvider";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { useGlobalState } from "~~/services/store/store";
 import { LnPaymentInvoice } from "~~/types/utils";
 import { GWEIPERSAT } from "~~/utils/scaffold-eth/common";
 
@@ -16,6 +17,7 @@ type SendModalProps = {
 };
 
 function SendModal({ isOpen, onClose }: SendModalProps) {
+  const { account } = useGlobalState();
   const { addTransaction, transactions, toastError } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
   const lnInvoiceRef = useRef<LnPaymentInvoice | null>(null);
@@ -34,14 +36,14 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
     if (transactions.length === 0) return;
     const lastTransaction = transactions[0];
     if (lastTransaction.lnInvoice !== lnInvoiceRef.current?.lnInvoice) return;
-    if (lastTransaction.status === "pending" && lastTransaction.contractId) {
+    if (lastTransaction.status === "PENDING" && lastTransaction.contractId) {
       setActiveStep(3);
     }
-    if (lastTransaction.status === "completed") {
+    if (lastTransaction.status === "COMPLETED") {
       setActiveStep(4);
       cleanAndClose();
     }
-    if (lastTransaction.status === "failed") {
+    if (lastTransaction.status === "FAILED") {
       setActiveStep(4);
       cleanAndClose();
     }
@@ -84,7 +86,7 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
     htlcContract.write
       .newContract(
         [
-          process.env.LSP_ADDRESS ?? "0xf89335a26933d8Dd6193fD91cAB4e1466e5198Bf",
+          process.env.LSP_ADDRESS ?? "0x7A02Bb41bBBd306A8E05d407928eaACeDF9c9395",
           lnInvoiceRef.current.paymentHash,
           BigInt(getMinTimelock(lnInvoiceRef.current.timeExpireDate)),
         ],
@@ -95,13 +97,15 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
       .then(tx => {
         console.log("txHash", tx);
         addTransaction({
-          status: "pending",
-          date: new Date().toLocaleString(),
+          status: "PENDING",
+          date: new Date().toISOString(), // Use ISO string for consistency
           amount: lnInvoiceRef.current ? lnInvoiceRef.current.satoshis : 0,
           txHash: tx,
           contractId: contractId || "",
-          hashLockTimestamp: getMinTimelock(lnInvoiceRef.current ? lnInvoiceRef.current.timeExpireDate : 0),
+          hashLockTimestamp: lnInvoiceRef.current ? lnInvoiceRef.current.timeExpireDate : 0,
           lnInvoice: lnInvoiceRef.current ? lnInvoiceRef.current.lnInvoice : "",
+          userAddress: account ?? "",
+          transactionType: "SENT",
         });
         setActiveStep(2);
       })

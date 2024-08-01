@@ -25,6 +25,24 @@ export const PaymentInvoice = ({ invoice, submitPayment, cancelPayment, step }: 
   const expiryDate = new Date(invoice.timeExpireDate * 1000);
   const { price } = useLightningApp();
 
+  // Calculate USD value of the invoice
+  const formatBTCBalance = (sats: number) => {
+    // Calculate the balance in sats
+    const balanceInSats = sats;
+
+    // Calculate the BTC value with the sats
+    const btcValue = balanceInSats / 100000000;
+
+    // Calculate the USD value with the sats
+    const fiatValue = btcValue * price;
+
+    const formattedBalance = fiatValue.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return `$${formattedBalance}`;
+  };
+
   // Assuming steps is an array of step objects used in your Stepper
 
   return (
@@ -41,7 +59,7 @@ export const PaymentInvoice = ({ invoice, submitPayment, cancelPayment, step }: 
           </tr>
           <tr>
             <td className="border-transparent">USD</td>
-            <td className="border-transparent text-right">${((invoice.satoshis * price) / 100_000_000).toFixed(3)}</td>
+            <td className="border-transparent text-right">{formatBTCBalance(invoice.satoshis)}</td>
           </tr>
           <tr>
             <td className="border-transparent">Service Fee</td>

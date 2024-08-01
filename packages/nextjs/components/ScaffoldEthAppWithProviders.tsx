@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import { Toaster } from "react-hot-toast";
-import { WagmiConfig } from "wagmi";
+import { WagmiConfig, useAccount } from "wagmi";
 import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
@@ -12,12 +12,14 @@ import { LightningProvider, useLightningApp } from "~~/hooks/LightningProvider";
 import { useDarkMode } from "~~/hooks/scaffold-eth/useDarkMode";
 import { useGlobalState } from "~~/services/store/store";
 import { botanixTestnet } from "~~/services/web3/botanixTestnet";
+import { sepoliaTestnet } from "~~/services/web3/sepoliaTestnet";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { appChains } from "~~/services/web3/wagmiConnectors";
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   const { price } = useLightningApp();
-  const setNativeCurrencyPrice = useGlobalState(state => state.setNativeCurrencyPrice);
+  const { setAccount, setNativeCurrencyPrice } = useGlobalState();
+  const { address } = useAccount();
 
   useEffect(() => {
     if (price > 0) {
@@ -25,9 +27,18 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
     }
   }, [setNativeCurrencyPrice, price]);
 
+  // Update account-related state
+  useEffect(() => {
+    if (address) {
+      setAccount(address);
+    } else {
+      setAccount("");
+    }
+  }, [address, setAccount]);
+
   return (
     <>
-      <div className="flex flex-col min-h-screen bg-base-200">
+      <div className="flex flex-col min-h-screen bg-base-200 font-mono">
         <Header />
         <div className="flex flex-col flex-1 justify-center relative">{children}</div>
         <Footer />
@@ -44,9 +55,10 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     <WagmiConfig config={wagmiConfig}>
       <ProgressBar />
       <RainbowKitProvider
-        chains={[...appChains.chains, botanixTestnet]}
+        // chains={[...appChains.chains, botanixTestnet]}
+        chains={[...appChains.chains, sepoliaTestnet]}
         avatar={BlockieAvatar}
-        theme={isDarkMode ? darkTheme() : lightTheme()}
+        // theme={isDarkMode ? darkTheme() : lightTheme()}
       >
         <LightningProvider>
           <ScaffoldEthApp>{children}</ScaffoldEthApp>

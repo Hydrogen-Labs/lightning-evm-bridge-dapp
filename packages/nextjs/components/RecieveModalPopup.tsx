@@ -9,6 +9,7 @@ import {
   KIND,
   RelayRequest,
   RelayResponse,
+  TxHashMessage,
   parseContractDetails,
 } from "@lightning-evm-bridge/shared";
 import { waitForTransaction } from "@wagmi/core";
@@ -18,6 +19,7 @@ import { sha256 } from "js-sha256";
 import { useWalletClient } from "wagmi";
 import { useLightningApp } from "~~/hooks/LightningProvider";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { useGlobalState } from "~~/services/store/store";
 import { LnPaymentInvoice } from "~~/types/utils";
 
 type RecieveModalProps = {
@@ -35,12 +37,14 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     hodlInvoiceResponse,
     setHashLock,
     recieveContractId,
+    addTransaction,
   } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [amount, setAmount] = useState<bigint>(BigInt(0));
   const lnInvoiceRef = useRef<LnPaymentInvoice | null>(null);
   const [txHash, setTxHash] = useState<string>("");
+  const { setDbUpdated } = useGlobalState();
 
   const { data: walletClient } = useWalletClient();
   function cleanAndClose() {
@@ -60,12 +64,19 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     };
 
     axios.post("http://localhost:3004/relay", msg).then(response => {
-      console.log(response);
+      console.log("relay-server response", response);
       const msg: RelayResponse = response.data;
       if (msg.status === "success" && msg.txHash) {
+        // sendTxHash(msg.txHash, msg.contractId);
+        const txHashMessage: TxHashMessage = {
+          kind: KIND.TX_HASH,
+          txHash: msg.txHash,
+          contractId: msg.contractId,
+        };
+        sendMessage(txHashMessage);
         setActiveStep(3);
         setTxHash(msg.txHash);
-        console.log("Relay Response", msg);
+        setDbUpdated(true);
       } else {
         toastError("Failed to relay contract and preimage");
       }
@@ -89,12 +100,12 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     if (recieveContractId === "") {
       return;
     }
-
     const retryDelay = 5000; // Delay time in milliseconds
     const maxRetries = 3; // Maximum number of retries
 
     const fetchContractDetails = async (retries = maxRetries) => {
       relayContractAndPreimage();
+      //**TODO this is not used?! */
       if (retryDelay > 0) {
         return;
       }
@@ -126,6 +137,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
 
         const secret = `0x${hashLock.secret}`;
         console.log("Withdrawing contract", recieveContractId, secret);
+
         const txHash = await htlcContract.write.withdraw([
           `${recieveContractId}` as `0x${string}`,
           secret as `0x${string}`,
@@ -142,6 +154,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
           toastError("Failed to process contract after several attempts.");
         }
       }
+      //**TODO this is not used?! */
     };
 
     setTimeout(() => {
@@ -225,9 +238,9 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
                   >
                     <path
                       stroke="currentColor"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
                       d="m7 9 4-4-4-4M1 9l4-4-4-4"
                     />
                   </svg>
@@ -254,9 +267,9 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
                   >
                     <path
                       stroke="currentColor"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
                       d="m7 9 4-4-4-4M1 9l4-4-4-4"
                     />
                   </svg>
