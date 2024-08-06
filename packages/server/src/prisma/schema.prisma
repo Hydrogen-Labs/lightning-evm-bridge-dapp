@@ -32,3 +32,11 @@ model Transaction {
   userAddress       String
   transactionType   TransactionType
 }
+
+model CachedPayment {
+  id         Int    @id @default(autoincrement())
+  contractId String @unique
+  secret     String
+  requiredBalance BigInt
+  createdAt  DateTime @default(now())
+}

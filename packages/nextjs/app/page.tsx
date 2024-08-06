@@ -1,9 +1,10 @@
 "use client";
 
 // Import necessary hooks and components
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "../styles/bg.css";
 import "../styles/glowButton.css";
+import { Transaction } from "@lightning-evm-bridge/shared";
 import { useAccount } from "wagmi";
 import { HistoryTable } from "~~/components/HistoryTable";
 import RecieveModal from "~~/components/RecieveModalPopup";
@@ -14,7 +15,7 @@ import { useAccountBalance } from "~~/hooks/scaffold-eth";
 import { useGlobalState } from "~~/services/store/store";
 
 const Home = () => {
-  const { account } = useGlobalState();
+  const { account, dbUpdated, setDbUpdated } = useGlobalState();
   const { address } = useAccount();
   const { balance } = useAccountBalance(address);
   const { isWebSocketConnected, price } = useLightningApp();
@@ -25,6 +26,7 @@ const Home = () => {
   const onCloseReceiveModal = () => setIsReceiveModalOpen(false);
   const onOpenReceiveModal = () => setIsReceiveModalOpen(true);
   const [balanceVisibility, setBalanceVisibility] = useState(0);
+  const [transactionsHT, setTransactionsHT] = useState<Transaction[]>([]);
 
   function getBalanceWithVisibility() {
     if (balance === null) return "Loading Balance...";
@@ -38,6 +40,33 @@ const Home = () => {
       return "****** sats";
     }
   }
+
+  const fetchTransactions = async () => {
+    if (!account) {
+      setTransactionsHT([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/transactions?userAddress=${account}`);
+      const data: Transaction[] = await response.json();
+      setTransactionsHT(data);
+    } catch (error) {
+      console.error("Failed to fetch transactions:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [account]);
+
+  // Refetch transactions when dbUpdated changes
+  useEffect(() => {
+    if (dbUpdated) {
+      fetchTransactions();
+      setDbUpdated(false); // Reset the flag
+    }
+  }, [dbUpdated]);
 
   return (
     <>
@@ -102,10 +131,15 @@ const Home = () => {
             </div>
           </div>
 
-          <HistoryTable />
+          <HistoryTable account={account} transactionsHT={transactionsHT} setTransactionsHT={setTransactionsHT} />
         </div>
 
-        <SendModalPopup isOpen={isSendModalOpen} onClose={onCloseSendModal} />
+        <SendModalPopup
+          isOpen={isSendModalOpen}
+          onClose={onCloseSendModal}
+          balance={balance}
+          transactionsHT={transactionsHT}
+        />
         <RecieveModal isOpen={isReceiveModalOpen} onClose={onCloseReceiveModal} />
       </div>
     </>

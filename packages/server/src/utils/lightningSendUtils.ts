@@ -9,7 +9,7 @@ import { providerConfig } from '../provider.config';
 import { ServerState } from '../types/types';
 import { getContractDetails, validateLnInvoiceAndContract } from './validation';
 
-export async function processClientInvoiceRequest(request: InvoiceRequest, ws: WebSocket, serverState: ServerState) {
+export async function processClientInvoiceRequest(request: InvoiceRequest, ws: WebSocket, serverState: ServerState, signerBalance: bigint) {
 	if (serverState.pendingContracts.includes(request.contractId)) {
 		ws.send(
 			JSON.stringify({
@@ -112,6 +112,7 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 		// await new Promise((resolve) => setTimeout(resolve, 10000)); // 10 second delay for testing purposes
 
 		console.log('Invoice and Contract are valid, proceeding with payment');
+
 		const paymentResponse = await pay({
 			lnd: serverState.lnd,
 			request: request.lnInvoice,
@@ -161,16 +162,62 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 			.then((tx: any) => {
 				console.log('Withdrawal Transaction:', tx);
 			})
-			.catch((error: any) => {
+			.catch(async (error: any) => {
 				console.error('Withdrawal Error:', error);
-				serverState.cachedPayments.push({
-					contractId: request.contractId,
-					secret: paymentResponse.secret,
-				});
+				// serverState.cachedPayments.push({
+				// 	contractId: request.contractId,
+				// 	secret: paymentResponse.secret,
+				// });
+
+				// Check if the error code indicates insufficient funds
+				if (error.code === 'INSUFFICIENT_FUNDS') {
+					// Extract relevant information from the error message
+					const balanceMatch = error.message.match(/balance (\d+)/);
+					const overshotMatch = error.message.match(/overshot (\d+)/);
+
+					if (balanceMatch && overshotMatch) {
+						const currentBalance = BigInt(balanceMatch[1]);
+						const overshotAmount = BigInt(overshotMatch[1]);
+
+						// Calculate the required balance
+						const requiredBalance = currentBalance + overshotAmount;
+
+						try {
+							await prisma.cachedPayment.create({
+								data: {
+									contractId: request.contractId,
+									secret: paymentResponse.secret,
+									requiredBalance: requiredBalance,
+								},
+							});
+							console.log('Cached payment added to the database.');
+						} catch (dbError) {
+							console.error('Error caching payment:', dbError);
+						}
+					} else {
+						console.error('Could not extract balance and overshot information from error message.');
+					}
+				} else {
+					// Handle other errors accordingly
+					console.error('An unexpected error occurred:', error);
+				}
 			});
 		console.log('Payment processed successfully');
 	} catch (error) {
 		console.error('Error during invoice processing:', error);
+		try {
+			// Update the transaction to FAILED status
+			await prisma.transaction.update({
+				where: { contractId: request.contractId },
+				data: {
+					status: TransactionStatus.FAILED,
+					date: new Date().toISOString(),
+				},
+			});
+			console.log('Payment failed, transaction status updated to FAILED.');
+		} catch (error) {
+			console.error('Error updating transaction to FAILED:', error);
+		}
 		ws.send(JSON.stringify({ status: 'error', message: 'Failed to process invoice.' }));
 	}
 }

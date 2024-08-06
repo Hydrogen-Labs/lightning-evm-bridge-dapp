@@ -8,13 +8,14 @@ import * as WebSocket from 'ws';
 import transactionsRouter from './routes/transactions';
 
 import { ClientRequest, ConnectionResponse, KIND, ServerStatus, deployedContracts } from '@lightning-evm-bridge/shared';
-import { authenticatedLndGrpc } from 'lightning';
+import { authenticatedLndGrpc, getChannels, getFailedPayments, getWalletInfo } from 'lightning';
 import { match } from 'ts-pattern';
 import { providerConfig } from './provider.config';
 import { CachedPayment, ServerState } from './types/types';
 import { handleTxHash } from './utils/handleTxHash';
 import { processClientLightningReceiveRequest } from './utils/lightningRecieveUtils';
 import { processClientInvoiceRequest } from './utils/lightningSendUtils';
+const { PrismaClient } = require('@prisma/client');
 
 dotenv.config();
 
@@ -42,6 +43,19 @@ const signer = new ethers.Wallet(LSP_PRIVATE_KEY, provider);
 const htlcContractInfo = deployedContracts[CHAIN_ID]?.HashedTimelock;
 const htlcContract = new ethers.Contract(htlcContractInfo.address, htlcContractInfo.abi, signer);
 const serverStatus: ServerStatus = process.env.LND_MACAROON ? ServerStatus.ACTIVE : ServerStatus.MOCK;
+
+// Fetch the signer's balance in wei and return it as a BigInt
+async function getSignerBalance() {
+	try {
+		// Fetch the balance in wei
+		const balanceWei = await provider.getBalance(signer.address);
+		// Convert to BigInt and return
+		return BigInt(balanceWei.toString());
+	} catch (error) {
+		console.error('Error fetching balance:', error);
+		return null; // Handle error scenario
+	}
+}
 
 let sockets: { [id: string]: WebSocket } = {};
 let cachedPayments: CachedPayment[] = [];
@@ -82,9 +96,12 @@ wss.on('connection', (ws: WebSocket) => {
 		console.log(`Message kind: ${request.kind}`);
 		console.log(`Full message: ${JSON.stringify(request, null, 2)}`);
 
+		// Get signer's balance
+		const signerBalance = await getSignerBalance();
+
 		match(request)
 			.with({ kind: KIND.INVOICE_SEND }, async (request) => {
-				await processClientInvoiceRequest(request, ws, serverState);
+				await processClientInvoiceRequest(request, ws, serverState, signerBalance);
 			})
 			.with({ kind: KIND.INITIATION_RECIEVE }, async (request) => {
 				await processClientLightningReceiveRequest(request, ws, serverState);
@@ -100,33 +117,49 @@ wss.on('connection', (ws: WebSocket) => {
 	ws.on('close', () => console.log('Client disconnected'));
 });
 
-// Function to process cached payments
+const prisma = new PrismaClient();
+
 async function processCachedPayments() {
-	if (cachedPayments.length === 0) {
-		return;
-	}
-	console.log(`Processing ${cachedPayments.length} cached payments...`);
-	for (let i = 0; i < cachedPayments.length; i++) {
-		const payment = cachedPayments[i];
-		try {
-			console.log(`Attempting to withdraw for contractId: ${payment.contractId}`);
-			const options = { gasPrice: ethers.parseUnits('0.001', 'gwei') };
-			await htlcContract
-				.withdraw(payment.contractId, '0x' + payment.secret) // remove options
-				.then((tx) => {
-					console.log('Withdrawal Transaction Success:', tx);
-					// Remove the successfully processed payment from the cache
-					cachedPayments = cachedPayments.filter((p) => p.contractId !== payment.contractId);
-				})
-				.catch(async (error) => {
-					// try again with a higher gas price
-					// carefull consideration should be given to the gas price
-					await htlcContract.withdraw(payment.contractId, '0x' + payment.secret);
-				});
-		} catch (error) {
-			console.error(`Error processing cached payment for contractId ${payment.contractId}:`, error);
-			// Handle any unexpected errors here
+	try {
+		const cachedPayments = await prisma.cachedPayment.findMany();
+		if (cachedPayments.length === 0) {
+			console.log('No cached payments to process.');
+			return;
 		}
+		console.log(`Processing ${cachedPayments.length} cached payments...`);
+
+		// Get signer's balance
+		const signerBalance = await getSignerBalance();
+		console.log(`Signer's balance: ${signerBalance.toString()} wei`);
+
+		for (const payment of cachedPayments) {
+			try {
+				if (BigInt(signerBalance) < BigInt(payment.requiredBalance)) {
+					console.log(`Insufficient balance for contractId: ${payment.contractId}, skipping...`);
+					continue;
+				}
+
+				console.log(`Attempting to withdraw for contractId: ${payment.contractId}`);
+				await htlcContract
+					.withdraw(payment.contractId, '0x' + payment.secret)
+					.then(async (tx) => {
+						console.log('Withdrawal Transaction Success:', tx);
+
+						await prisma.cachedPayment.delete({
+							where: { contractId: payment.contractId },
+						});
+						console.log(`Successfully processed and removed payment for contractId: ${payment.contractId}`);
+					})
+					.catch((error) => {
+						console.error(`Error with withdrawal for contractId ${payment.contractId}:`, error);
+						// Handle retry logic or other actions as needed
+					});
+			} catch (error) {
+				console.error(`Error processing cached payment for contractId ${payment.contractId}:`, error);
+			}
+		}
+	} catch (error) {
+		console.error('Error fetching cached payments:', error);
 	}
 }
 

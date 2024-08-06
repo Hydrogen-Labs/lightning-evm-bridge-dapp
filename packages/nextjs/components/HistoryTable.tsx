@@ -3,11 +3,14 @@ import { Transaction } from "@lightning-evm-bridge/shared";
 import "react-toastify/dist/ReactToastify.css";
 import { useWalletClient } from "wagmi";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
-import { useGlobalState } from "~~/services/store/store";
 
-export const HistoryTable = () => {
-  const { account, dbUpdated, setDbUpdated } = useGlobalState();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+type HistoryTableProps = {
+  account: string | null;
+  transactionsHT: Transaction[];
+  setTransactionsHT: React.Dispatch<React.SetStateAction<Transaction[]>>;
+};
+
+export const HistoryTable = ({ account, transactionsHT, setTransactionsHT }: HistoryTableProps) => {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const { data: walletClient } = useWalletClient();
   const { data: htlcContract } = useScaffoldContract({
@@ -15,46 +18,19 @@ export const HistoryTable = () => {
     walletClient,
   });
 
-  const fetchTransactions = async () => {
-    if (!account) {
-      setTransactions([]);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/transactions?userAddress=${account}`);
-      const data: Transaction[] = await response.json();
-      setTransactions(data);
-    } catch (error) {
-      console.error("Failed to fetch transactions:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchTransactions();
-  }, [account]);
-
-  // Refetch transactions when dbUpdated changes
-  useEffect(() => {
-    if (dbUpdated) {
-      fetchTransactions();
-      setDbUpdated(false); // Reset the flag
-    }
-  }, [dbUpdated]);
-
   const toggleRow = (index: number | null) => {
     setExpandedRow(expandedRow === index ? null : index);
     if (index === null) return;
 
-    // if (transactions[index].status === "failed") {
-    //   refund(transactions[index]);
+    // if (transactionsHT[index].status === "failed") {
+    //   refund(transactionsHT[index]);
     // }
   };
 
   // refund transaction if status is failed
   const initiateRefund = (index: number) => {
-    if (transactions[index].status === "FAILED") {
-      refund(transactions[index]);
+    if (transactionsHT[index].status === "FAILED") {
+      refund(transactionsHT[index]);
     }
   };
 
@@ -97,7 +73,7 @@ export const HistoryTable = () => {
           .then(data => console.log("Server updated:", data))
           .catch(error => console.error("Error updating server:", error));
 
-        setTransactions(prevTransactions =>
+        setTransactionsHT(prevTransactions =>
           prevTransactions.map(t => (t.txHash === transaction.txHash ? updatedTransaction : t)),
         );
       })
@@ -138,8 +114,8 @@ export const HistoryTable = () => {
               </tr>
             </thead>
             <tbody>
-              {transactions.length > 0 ? (
-                transactions.map((transaction, index) => (
+              {transactionsHT.length > 0 ? (
+                transactionsHT.map((transaction, index) => (
                   <React.Fragment key={index}>
                     <tr
                       key={transaction.txHash}
@@ -250,15 +226,15 @@ export const HistoryTable = () => {
                               <div className="flex justify-between items-center">
                                 <button
                                   className={`btn btn-sm ${
-                                    transactions[index].status === "FAILED" &&
-                                    transactions[index].hashLockTimestamp < Date.now() / 1000
+                                    transactionsHT[index].status === "FAILED" &&
+                                    transactionsHT[index].hashLockTimestamp < Date.now() / 1000
                                       ? "btn-neutral"
                                       : "btn-disabled cursor-not-allowed bg-red-500"
                                   }`}
                                   onClick={account ? () => initiateRefund(index) : undefined}
                                   disabled={
-                                    transactions[index].status === "FAILED" &&
-                                    transactions[index].hashLockTimestamp < Date.now() / 1000
+                                    transactionsHT[index].status === "FAILED" &&
+                                    transactionsHT[index].hashLockTimestamp < Date.now() / 1000
                                   }
                                 >
                                   Initiate Refund

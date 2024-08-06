@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Transaction } from "@lightning-evm-bridge/shared";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { PaymentRequestObject, decode } from "bolt11";
 import { useWalletClient } from "wagmi";
@@ -14,9 +15,11 @@ import { GWEIPERSAT } from "~~/utils/scaffold-eth/common";
 type SendModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  balance: number | null;
+  transactionsHT: Transaction[];
 };
 
-function SendModal({ isOpen, onClose }: SendModalProps) {
+function SendModal({ isOpen, onClose, balance, transactionsHT }: SendModalProps) {
   const { account } = useGlobalState();
   const { addTransaction, transactions, toastError } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
@@ -188,7 +191,9 @@ function SendModal({ isOpen, onClose }: SendModalProps) {
                   invoice={lnInvoiceRef.current}
                   submitPayment={submitPayment}
                   contractId={contractId}
+                  transactionsHT={transactionsHT}
                   step={activeStep}
+                  balance={balance}
                   expiryDate={getMinTimelock(lnInvoiceRef.current.timeExpireDate).toString()}
                   cancelPayment={() => {
                     lnInvoiceRef.current = null;
