@@ -89,6 +89,7 @@ export interface ConnectionResponse {
 	serverConfig: ProviderConfig;
 	uuid: string;
 	message: string;
+	signerSolvency: boolean;
 }
 
 export type ServerResponse = InvoiceResponse | ConnectionResponse | HodlInvoiceResponse | HodlInvoiceContractResponse;
@@ -120,7 +121,7 @@ export type ContractDetails = {
 };
 
 export type Transaction = {
-	status: 'PENDING' | 'FAILED' | 'COMPLETED' | 'REFUNDED' | 'RELAYED';
+	status: 'PENDING' | 'FAILED' | 'COMPLETED' | 'REFUNDED' | 'RELAYED' | 'CACHED';
 	date: string;
 	amount: number;
 	txHash: string;

@@ -7,9 +7,10 @@ import * as WebSocket from 'ws';
 import prisma from '../prismaClient';
 import { providerConfig } from '../provider.config';
 import { ServerState } from '../types/types';
+import { updateChannelBalances } from './balanceUtils';
 import { getContractDetails, validateLnInvoiceAndContract } from './validation';
 
-export async function processClientInvoiceRequest(request: InvoiceRequest, ws: WebSocket, serverState: ServerState, signerBalance: bigint) {
+export async function processClientInvoiceRequest(request: InvoiceRequest, ws: WebSocket, serverState: ServerState) {
 	if (serverState.pendingContracts.includes(request.contractId)) {
 		ws.send(
 			JSON.stringify({
@@ -108,9 +109,6 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 			})
 		);
 
-		// Simulate processing delay
-		// await new Promise((resolve) => setTimeout(resolve, 10000)); // 10 second delay for testing purposes
-
 		console.log('Invoice and Contract are valid, proceeding with payment');
 
 		const paymentResponse = await pay({
@@ -120,86 +118,51 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 		});
 
 		console.log('Payment Response:', paymentResponse);
-		if (paymentResponse) {
-			try {
-				// Update the existing transaction in the database
-				await prisma.transaction.update({
-					where: { contractId: request.contractId },
-					data: {
-						status: TransactionStatus.COMPLETED,
-						date: new Date().toISOString(),
-					},
-				});
-			} catch (error) {
-				console.error('Error updating transaction to COMPLETED:', error);
-			}
-		} else {
-			try {
-				// Update the transaction to FAILED status
-				await prisma.transaction.update({
-					where: { contractId: request.contractId },
-					data: {
-						status: TransactionStatus.FAILED,
-						date: new Date().toISOString(),
-					},
-				});
-				console.log('Payment failed, transaction status updated to FAILED.');
-			} catch (error) {
-				console.error('Error updating transaction to FAILED:', error);
-			}
-		}
 
 		ws.send(
 			JSON.stringify({
-				status: 'success',
+				status: 'pending',
 				message: 'Invoice paid successfully.',
 			})
 		);
+
 		// Critical point, if this withdraw fails, the LSP will lose funds
 		// We should cache the paymentResponse.secret and request.contractId and retry the withdrawal if it fails
 		await serverState.htlcContract
 			.withdraw(request.contractId, '0x' + paymentResponse.secret) // remove options
-			.then((tx: any) => {
+			.then(async (tx: any) => {
 				console.log('Withdrawal Transaction:', tx);
+				try {
+					// Update the existing transaction in the database
+					await prisma.transaction.update({
+						where: { contractId: request.contractId },
+						data: {
+							status: TransactionStatus.COMPLETED,
+							date: new Date().toISOString(),
+						},
+					});
+					// Update the channel balances after processing the invoice
+					await updateChannelBalances(serverState.lnd);
+					ws.send(JSON.stringify({ status: 'success', message: 'Invoice withdrawn successfully.' }));
+				} catch (error) {
+					console.error('Error updating transaction to COMPLETED:', error);
+				}
 			})
 			.catch(async (error: any) => {
 				console.error('Withdrawal Error:', error);
-				// serverState.cachedPayments.push({
-				// 	contractId: request.contractId,
-				// 	secret: paymentResponse.secret,
-				// });
-
-				// Check if the error code indicates insufficient funds
-				if (error.code === 'INSUFFICIENT_FUNDS') {
-					// Extract relevant information from the error message
-					const balanceMatch = error.message.match(/balance (\d+)/);
-					const overshotMatch = error.message.match(/overshot (\d+)/);
-
-					if (balanceMatch && overshotMatch) {
-						const currentBalance = BigInt(balanceMatch[1]);
-						const overshotAmount = BigInt(overshotMatch[1]);
-
-						// Calculate the required balance
-						const requiredBalance = currentBalance + overshotAmount;
-
-						try {
-							await prisma.cachedPayment.create({
-								data: {
-									contractId: request.contractId,
-									secret: paymentResponse.secret,
-									requiredBalance: requiredBalance,
-								},
-							});
-							console.log('Cached payment added to the database.');
-						} catch (dbError) {
-							console.error('Error caching payment:', dbError);
-						}
-					} else {
-						console.error('Could not extract balance and overshot information from error message.');
-					}
-				} else {
-					// Handle other errors accordingly
-					console.error('An unexpected error occurred:', error);
+				try {
+					await prisma.transaction.update({
+						where: { contractId: request.contractId },
+						data: {
+							status: TransactionStatus.CACHED,
+							secret: paymentResponse.secret,
+							date: new Date().toISOString(),
+						},
+					});
+					console.log('Cached payment added to the database.');
+					ws.send(JSON.stringify({ status: 'pending', message: 'Invoice cached successfully.' }));
+				} catch (dbError) {
+					console.error('Error caching payment:', dbError);
 				}
 			});
 		console.log('Payment processed successfully');

@@ -8,10 +8,12 @@ import * as WebSocket from 'ws';
 import transactionsRouter from './routes/transactions';
 
 import { ClientRequest, ConnectionResponse, KIND, ServerStatus, deployedContracts } from '@lightning-evm-bridge/shared';
-import { authenticatedLndGrpc, getChannels, getFailedPayments, getWalletInfo } from 'lightning';
+import { TransactionStatus } from '@prisma/client';
+import { authenticatedLndGrpc, getChannels } from 'lightning';
 import { match } from 'ts-pattern';
 import { providerConfig } from './provider.config';
 import { CachedPayment, ServerState } from './types/types';
+import { updateChannelBalances } from './utils/balanceUtils';
 import { handleTxHash } from './utils/handleTxHash';
 import { processClientLightningReceiveRequest } from './utils/lightningRecieveUtils';
 import { processClientInvoiceRequest } from './utils/lightningSendUtils';
@@ -26,18 +28,14 @@ if (!RPC_URL || !LSP_PRIVATE_KEY || !CHAIN_ID) {
 	process.exit(1);
 }
 
-// Initialize WebSocket services
-const wss = new WebSocket.Server({
-	port: Number(PORT) || 3003,
-	clientTracking: true,
-});
-
+// Initialize LND gRPC connection
 const { lnd } = authenticatedLndGrpc({
 	cert: LND_TLS_CERT,
 	macaroon: LND_MACAROON,
 	socket: LND_SOCKET,
 });
 
+// Initialize provider and signer
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(LSP_PRIVATE_KEY, provider);
 const htlcContractInfo = deployedContracts[CHAIN_ID]?.HashedTimelock;
@@ -49,17 +47,113 @@ async function getSignerBalance() {
 	try {
 		// Fetch the balance in wei
 		const balanceWei = await provider.getBalance(signer.address);
-		// Convert to BigInt and return
-		return BigInt(balanceWei.toString());
+		// Convert to BigInt
+		const signerBalance = BigInt(balanceWei.toString());
+
+		// Convert to Ether and log the balance
+		const signerBalanceInEther = ethers.formatEther(signerBalance);
+		console.log(`Signer's balance: ${signerBalanceInEther} ETH`);
+
+		// Check if the balance is greater or equal to 0.1 ether
+		const signerBalanceSolvency = signerBalance >= BigInt(1e17);
+		console.log(`Signer's solvency: ${signerBalanceSolvency}`);
+
+		// Return the desired values
+		return {
+			signerBalance,
+			signerBalanceInEther,
+			signerBalanceSolvency,
+		};
 	} catch (error) {
 		console.error('Error fetching balance:', error);
 		return null; // Handle error scenario
 	}
 }
 
+async function fetchAndSummarizeBalances() {
+	try {
+		// Fetch the channels
+		const channels = await getChannels({ lnd });
+		console.log('Channels:', channels);
+
+		let totalLocalBalance = 0;
+		let totalRemoteBalance = 0;
+
+		// Iterate through each channel and sum up the balances
+		channels.channels.forEach((channel) => {
+			totalLocalBalance += Number(channel.local_balance);
+			totalRemoteBalance += Number(channel.remote_balance);
+		});
+
+		console.log('Total Local Balance:', totalLocalBalance);
+		console.log('Total Remote Balance:', totalRemoteBalance);
+
+		const newCombinedBalance = totalLocalBalance + totalRemoteBalance;
+		console.log('New Combined Balance:', newCombinedBalance);
+
+		if (isNaN(newCombinedBalance)) {
+			console.error('Combined Balance is not a number:', newCombinedBalance);
+			return null;
+		}
+
+		const balanceRecords = await prisma.channelBalance.findMany({
+			orderBy: { date: 'desc' },
+			take: 2,
+		});
+
+		if (balanceRecords.length > 0) {
+			const lastBalanceRecord = balanceRecords[0];
+			const lastCombinedBalance = lastBalanceRecord.combinedBalance;
+
+			if (newCombinedBalance < lastCombinedBalance) {
+				console.error('Error: New combined balance is less than the previous combined balance. Potential fund loss.');
+				// Handle the error as needed
+				return null;
+			}
+		}
+
+		await prisma.channelBalance.create({
+			data: {
+				totalLocalBalance,
+				totalRemoteBalance,
+				combinedBalance: newCombinedBalance,
+			},
+		});
+
+		if (balanceRecords.length > 1) {
+			const oldestBalanceRecordId = balanceRecords[1].id;
+			await prisma.channelBalance.delete({
+				where: { id: oldestBalanceRecordId },
+			});
+		}
+
+		return {
+			totalLocalBalance,
+			totalRemoteBalance,
+			combinedBalance: newCombinedBalance,
+		};
+	} catch (error) {
+		console.error('Error fetching or summarizing balances:', error);
+		return null;
+	}
+}
+
 let sockets: { [id: string]: WebSocket } = {};
 let cachedPayments: CachedPayment[] = [];
 let pendingContracts: string[] = [];
+let initialBalances;
+
+// Fetch initial balances at the start
+(async () => {
+	initialBalances = await fetchAndSummarizeBalances();
+	if (initialBalances) {
+		console.log(`Initial Total Local Balance: ${initialBalances.totalLocalBalance}`);
+		console.log(`Initial Total Remote Balance: ${initialBalances.totalRemoteBalance}`);
+		console.log(`Initial Combined Balance: ${initialBalances.combinedBalance}`);
+	} else {
+		console.log('Failed to fetch initial balances.');
+	}
+})();
 
 console.log(`RPC Provider is running on ${RPC_URL}`);
 console.log(`WebSocket server is running on ws://localhost:${PORT || 3003}`);
@@ -73,8 +167,22 @@ const serverState: ServerState = {
 	serverStatus,
 };
 
-wss.on('connection', (ws: WebSocket) => {
+// Initialize WebSocket services
+const wss = new WebSocket.Server({
+	port: Number(PORT) || 3003,
+	clientTracking: true,
+});
+
+wss.on('connection', async (ws: WebSocket) => {
 	console.log('Client connected');
+
+	// Get signer's balance info
+	const signerBalanceInfo = await getSignerBalance();
+	if (signerBalanceInfo) {
+		console.log('signerBalanceInfo', signerBalanceInfo);
+	} else {
+		console.log('Failed to fetch balance.');
+	}
 
 	const uuid = uuidv4();
 	sockets[uuid] = ws;
@@ -84,6 +192,7 @@ wss.on('connection', (ws: WebSocket) => {
 		serverConfig: providerConfig,
 		uuid,
 		message: 'Connected to server',
+		signerSolvency: signerBalanceInfo.signerBalanceSolvency,
 	};
 
 	ws.send(JSON.stringify(connectionResponse));
@@ -92,22 +201,15 @@ wss.on('connection', (ws: WebSocket) => {
 		console.log('Received message:', message);
 		const request: ClientRequest = JSON.parse(message);
 
-		// Extract and log the kind of the message
-		console.log(`Message kind: ${request.kind}`);
-		console.log(`Full message: ${JSON.stringify(request, null, 2)}`);
-
-		// Get signer's balance
-		const signerBalance = await getSignerBalance();
-
 		match(request)
 			.with({ kind: KIND.INVOICE_SEND }, async (request) => {
-				await processClientInvoiceRequest(request, ws, serverState, signerBalance);
+				await processClientInvoiceRequest(request, ws, serverState);
 			})
 			.with({ kind: KIND.INITIATION_RECIEVE }, async (request) => {
 				await processClientLightningReceiveRequest(request, ws, serverState);
 			})
 			.with({ kind: KIND.TX_HASH }, async (request) => {
-				await handleTxHash(request);
+				await handleTxHash(request, serverState);
 			})
 			.otherwise((request) => {
 				console.warn('Unknown message kind:', request.kind);
@@ -115,13 +217,21 @@ wss.on('connection', (ws: WebSocket) => {
 	});
 
 	ws.on('close', () => console.log('Client disconnected'));
+
+	// Poll every 30 seconds to process cached payments
+	setInterval(() => processCachedPayments(ws), 30000);
 });
 
 const prisma = new PrismaClient();
 
-async function processCachedPayments() {
+async function processCachedPayments(ws: WebSocket) {
 	try {
-		const cachedPayments = await prisma.cachedPayment.findMany();
+		const cachedPayments = await prisma.transaction.findMany({
+			where: {
+				status: 'CACHED',
+			},
+		});
+
 		if (cachedPayments.length === 0) {
 			console.log('No cached payments to process.');
 			return;
@@ -134,21 +244,23 @@ async function processCachedPayments() {
 
 		for (const payment of cachedPayments) {
 			try {
-				if (BigInt(signerBalance) < BigInt(payment.requiredBalance)) {
-					console.log(`Insufficient balance for contractId: ${payment.contractId}, skipping...`);
-					continue;
-				}
-
 				console.log(`Attempting to withdraw for contractId: ${payment.contractId}`);
 				await htlcContract
 					.withdraw(payment.contractId, '0x' + payment.secret)
 					.then(async (tx) => {
 						console.log('Withdrawal Transaction Success:', tx);
 
-						await prisma.cachedPayment.delete({
+						await prisma.transaction.update({
 							where: { contractId: payment.contractId },
+							data: {
+								status: TransactionStatus.COMPLETED,
+								date: new Date().toISOString(),
+							},
 						});
-						console.log(`Successfully processed and removed payment for contractId: ${payment.contractId}`);
+						// Update the channel balances after processing the invoice
+						await updateChannelBalances(serverState.lnd);
+						console.log(`Successfully processed cached payment for contractId: ${payment.contractId}`);
+						ws.send(JSON.stringify({ status: 'success', message: 'Invoice withdrawn successfully.' }));
 					})
 					.catch((error) => {
 						console.error(`Error with withdrawal for contractId ${payment.contractId}:`, error);
@@ -162,9 +274,6 @@ async function processCachedPayments() {
 		console.error('Error fetching cached payments:', error);
 	}
 }
-
-// Poll every 30 seconds
-setInterval(processCachedPayments, 30000);
 
 // Express HTTP server setup
 const app = express();

@@ -33,13 +33,13 @@ export const PaymentInvoice = ({
   transactionsHT,
 }: PaymentInvoiceProps) => {
   const expiryDate = new Date(invoice.timeExpireDate * 1000);
-  const { price } = useLightningApp();
+  const { price, signerSolvency } = useLightningApp();
 
   // Check if the invoice has already been paid
   const isPaid = transactionsHT.some(transaction => transaction.lnInvoice === invoice.lnInvoice);
 
   // Format to satoshis
-  const satoshiBalance = balance * 100_000_000;
+  const satoshiBalance = (balance ?? 0) * 100_000_000;
 
   // Calculate USD value of the invoice
   const formatBTCBalance = (sats: number) => {
@@ -119,7 +119,7 @@ export const PaymentInvoice = ({
                 step !== 1 ? "opacity-50 cursor-not-allowed" : ""
               }`}
               onClick={() => submitPayment()}
-              disabled={step == 2 || step == 3}
+              disabled={step == 2 || step == 3 || !signerSolvency}
             >
               Pay
             </button>

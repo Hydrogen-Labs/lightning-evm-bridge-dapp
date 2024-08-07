@@ -5,10 +5,8 @@ import {
 	InitiationRequest,
 	InitiationResponse,
 	KIND,
-	RelayResponse,
 } from '@lightning-evm-bridge/shared';
 import { TransactionStatus, TransactionType } from '@prisma/client';
-import { ethers } from 'ethers';
 import { cancelHodlInvoice, createHodlInvoice, createInvoice, settleHodlInvoice, subscribeToInvoice } from 'lightning';
 import * as WebSocket from 'ws';
 import prisma from '../prismaClient';

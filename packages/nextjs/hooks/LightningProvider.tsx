@@ -16,7 +16,7 @@ import { HashLock } from "~~/types/utils";
 
 // Define the types for your historical transactions and context
 export type HistoricalTransaction = {
-  status: "PENDING" | "FAILED" | "COMPLETED" | "REFUNDED" | "RELAYED";
+  status: "PENDING" | "FAILED" | "COMPLETED" | "REFUNDED" | "RELAYED" | "CACHED";
   date: string;
   amount: number;
   contractId: string;
@@ -40,6 +40,7 @@ export type LightningAppContextType = {
   lspStatus: ServerStatus;
   lnInitationResponse: InitiationResponse | null;
   hodlInvoiceResponse: HodlInvoiceResponse | null;
+  signerSolvency: boolean;
   hashLock: HashLock | null;
   setHashLock: (hashLock: HashLock) => void;
   recieveContractId: string;
@@ -70,6 +71,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     lnInitationResponse,
     recieveContractId,
     hodlInvoiceResponse,
+    signerSolvency,
   } = useWebSocket(process.env.WEBSOCKET_URL ?? "ws://localhost:3003");
 
   const toastSuccess = (message: string) => {
@@ -240,6 +242,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
         lspStatus: status,
         lnInitationResponse,
         hodlInvoiceResponse,
+        signerSolvency,
         hashLock,
         setHashLock,
         recieveContractId,

@@ -18,6 +18,7 @@ enum TransactionStatus {
   COMPLETED
   REFUNDED
   RELAYED
+  CACHED
 }
 
 model Transaction {
@@ -27,16 +28,17 @@ model Transaction {
   amount            Int
   txHash            String            
   contractId        String            @unique
+  secret            String?
   hashLockTimestamp Int
   lnInvoice         String
   userAddress       String
   transactionType   TransactionType
 }
 
-model CachedPayment {
-  id         Int    @id @default(autoincrement())
-  contractId String @unique
-  secret     String
-  requiredBalance BigInt
-  createdAt  DateTime @default(now())
+model ChannelBalance {
+  id                Int      @id @default(autoincrement())
+  date              DateTime @default(now())
+  totalLocalBalance Int
+  totalRemoteBalance Int
+  combinedBalance   Int
 }

@@ -5,7 +5,7 @@ import { useWalletClient } from "wagmi";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
 
 type HistoryTableProps = {
-  account: string | null;
+  account: string | undefined;
   transactionsHT: Transaction[];
   setTransactionsHT: React.Dispatch<React.SetStateAction<Transaction[]>>;
 };
@@ -44,6 +44,8 @@ export const HistoryTable = ({ account, transactionsHT, setTransactionsHT }: His
         return `Transaction failed: Redeemable at ${new Date(transaction.hashLockTimestamp * 1000).toLocaleString()}`;
       case "REFUNDED":
         return "Transaction refunded";
+      case "CACHED":
+        return "Waiting for the transaction";
       default:
         return "";
     }

@@ -62,7 +62,7 @@ function SendModal({ isOpen, onClose, balance, transactionsHT }: SendModalProps)
 
   function getMinTimelock(lnInvoiceTimelock: number) {
     const now = Math.floor(Date.now() / 1000);
-    return Math.min(now + 600, lnInvoiceTimelock);
+    return Math.min(now + 600, lnInvoiceTimelock); // 10 minutes
   }
 
   function handleScan(data: any) {
