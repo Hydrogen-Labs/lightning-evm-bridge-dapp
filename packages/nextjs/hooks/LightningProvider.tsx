@@ -40,7 +40,7 @@ export type LightningAppContextType = {
   lspStatus: ServerStatus;
   lnInitationResponse: InitiationResponse | null;
   hodlInvoiceResponse: HodlInvoiceResponse | null;
-  signerSolvency: boolean;
+  signerActive: boolean;
   hashLock: HashLock | null;
   setHashLock: (hashLock: HashLock) => void;
   recieveContractId: string;
@@ -71,7 +71,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     lnInitationResponse,
     recieveContractId,
     hodlInvoiceResponse,
-    signerSolvency,
+    signerActive,
   } = useWebSocket(process.env.WEBSOCKET_URL ?? "ws://localhost:3003");
 
   const toastSuccess = (message: string) => {
@@ -157,6 +157,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     }
 
     if (data?.status === "success") {
+      setDbUpdated(true);
       toastSuccess("Payment successful");
     } else {
       toastError(data.message);
@@ -203,28 +204,6 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     }
     setTransactions(updatedTransactions);
     setDbUpdated(true);
-
-    // try {
-    //   console.log("Saving transaction to server:", updatedTransaction);
-    //   const response = await fetch("http://localhost:3002/api/transactions/process", {
-    //     method: "POST",
-    //     headers: {
-    //       "Content-Type": "application/json",
-    //     },
-    //     body: JSON.stringify(updatedTransaction),
-    //   });
-
-    //   if (!response.ok) {
-    //     throw new Error("Failed to save transaction");
-    //   }
-    //   const result = await response.json();
-    //   console.log("Transaction saved:", result);
-
-    //   // Set the dbUpdated flag to true
-    //   setDbUpdated(true);
-    // } catch (error) {
-    //   console.error("Error saving transaction:", error);
-    // }
   };
 
   return (
@@ -242,7 +221,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
         lspStatus: status,
         lnInitationResponse,
         hodlInvoiceResponse,
-        signerSolvency,
+        signerActive,
         hashLock,
         setHashLock,
         recieveContractId,

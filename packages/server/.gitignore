@@ -1,0 +1,15 @@
+# Node.js dependencies
+node_modules/
+
+# Logs
+logs/
+
+# Environment variables
+.env
+
+# TypeScript build output
+dist/
+
+# misc
+.DS_Store
+*.pem

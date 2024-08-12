@@ -1,6 +1,7 @@
 // balanceUtils.ts
 import { PrismaClient } from '@prisma/client';
 import { getChannels } from 'lightning';
+import logger from '../logger';
 
 const prisma = new PrismaClient();
 
@@ -9,10 +10,12 @@ export async function updateChannelBalances(lnd: any) {
 		const channels = await getChannels({ lnd });
 		let totalLocalBalance = 0;
 		let totalRemoteBalance = 0;
+		let totalUnsettledBalance = 0;
 
 		channels.channels.forEach((channel) => {
 			totalLocalBalance += channel.local_balance;
 			totalRemoteBalance += channel.remote_balance;
+			totalUnsettledBalance += channel.unsettled_balance || 0;
 		});
 
 		const newCombinedBalance = totalLocalBalance + totalRemoteBalance;
@@ -28,7 +31,7 @@ export async function updateChannelBalances(lnd: any) {
 			const lastCombinedBalance = lastBalanceRecord.combinedBalance;
 
 			if (newCombinedBalance < lastCombinedBalance) {
-				console.error('Error: New combined balance is less than the previous combined balance. Potential fund loss.');
+				logger.error('Error: New combined balance is less than the previous combined balance. Potential fund loss.');
 				// Handle the error as needed, for example:
 				// throw new Error('Potential fund loss detected.');
 				process.exit(1); // Stop the server
@@ -52,8 +55,8 @@ export async function updateChannelBalances(lnd: any) {
 			});
 		}
 
-		console.log(`Updated Channel Balances: Local - ${totalLocalBalance}, Remote - ${totalRemoteBalance}, Combined - ${newCombinedBalance}`);
+		logger.info(`Updated Channel Balances: Local - ${totalLocalBalance}, Remote - ${totalRemoteBalance}, Combined - ${newCombinedBalance}`);
 	} catch (error) {
-		console.error('Error updating channel balances:', error);
+		logger.error('Error updating channel balances:', error);
 	}
 }

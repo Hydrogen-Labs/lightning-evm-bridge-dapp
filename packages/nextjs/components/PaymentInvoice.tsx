@@ -33,7 +33,7 @@ export const PaymentInvoice = ({
   transactionsHT,
 }: PaymentInvoiceProps) => {
   const expiryDate = new Date(invoice.timeExpireDate * 1000);
-  const { price, signerSolvency } = useLightningApp();
+  const { price, signerActive } = useLightningApp();
 
   // Check if the invoice has already been paid
   const isPaid = transactionsHT.some(transaction => transaction.lnInvoice === invoice.lnInvoice);
@@ -119,7 +119,7 @@ export const PaymentInvoice = ({
                 step !== 1 ? "opacity-50 cursor-not-allowed" : ""
               }`}
               onClick={() => submitPayment()}
-              disabled={step == 2 || step == 3 || !signerSolvency}
+              disabled={step == 2 || step == 3 || !signerActive}
             >
               Pay
             </button>

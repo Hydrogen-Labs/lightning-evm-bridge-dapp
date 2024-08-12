@@ -195,7 +195,7 @@ export const HistoryTable = ({ account, transactionsHT, setTransactionsHT }: His
                                   />
                                 </svg>
                               </button>
-                              &nbsp; Transaction Hash: {transaction.txHash.substring(0, 20)}...
+                              &nbsp; Transaction Hash: {transaction?.txHash?.substring(0, 20)}...
                             </div>
                             <br />
                             <div className="flex justify-start items-center">

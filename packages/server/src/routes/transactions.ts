@@ -1,4 +1,5 @@
 import express from 'express';
+import logger from '../logger';
 import prisma from '../prismaClient';
 import { getContractInstance } from '../utils/contract'; // Utility to get contract instance
 import { checkRefundedFlag } from '../utils/validation';
@@ -33,7 +34,7 @@ router.post('/refund', async (req, res) => {
 
 		res.status(200).json(updatedTransaction);
 	} catch (error) {
-		console.error('Error verifying refund:', error);
+		logger.error('Error verifying refund:', error);
 		res.status(500).json({ error: 'Internal Server Error' });
 	}
 });
@@ -56,7 +57,7 @@ router.get('/', async (req, res) => {
 		});
 		res.status(200).json(transactions);
 	} catch (error) {
-		console.error('Failed to fetch transactions:', error);
+		logger.error('Failed to fetch transactions:', error);
 		res.status(500).json({ error: 'Failed to fetch transactions' });
 	}
 });

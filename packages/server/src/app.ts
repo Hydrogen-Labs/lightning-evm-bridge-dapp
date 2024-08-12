@@ -11,6 +11,7 @@ import { ClientRequest, ConnectionResponse, KIND, ServerStatus, deployedContract
 import { TransactionStatus } from '@prisma/client';
 import { authenticatedLndGrpc, getChannels } from 'lightning';
 import { match } from 'ts-pattern';
+import logger from './logger';
 import { providerConfig } from './provider.config';
 import { CachedPayment, ServerState } from './types/types';
 import { updateChannelBalances } from './utils/balanceUtils';
@@ -24,7 +25,7 @@ dotenv.config();
 // Verify environment variables
 const { PORT, LND_MACAROON, LND_SOCKET, RPC_URL, LSP_PRIVATE_KEY, CHAIN_ID, LND_TLS_CERT, HTTP_PORT } = process.env;
 if (!RPC_URL || !LSP_PRIVATE_KEY || !CHAIN_ID) {
-	console.error('Missing environment variables');
+	logger.error('Missing environment variables');
 	process.exit(1);
 }
 
@@ -52,20 +53,20 @@ async function getSignerBalance() {
 
 		// Convert to Ether and log the balance
 		const signerBalanceInEther = ethers.formatEther(signerBalance);
-		console.log(`Signer's balance: ${signerBalanceInEther} ETH`);
+		logger.info(`Signer's balance: ${signerBalanceInEther} ETH`);
 
 		// Check if the balance is greater or equal to 0.1 ether
-		const signerBalanceSolvency = signerBalance >= BigInt(1e17);
-		console.log(`Signer's solvency: ${signerBalanceSolvency}`);
+		const isSignerBalanceActive = signerBalance >= BigInt(1e17);
+		logger.info(`Signer's active: ${isSignerBalanceActive}`);
 
 		// Return the desired values
 		return {
 			signerBalance,
 			signerBalanceInEther,
-			signerBalanceSolvency,
+			isSignerBalanceActive,
 		};
 	} catch (error) {
-		console.error('Error fetching balance:', error);
+		logger.error('Error fetching balance:', error);
 		return null; // Handle error scenario
 	}
 }
@@ -74,7 +75,7 @@ async function fetchAndSummarizeBalances() {
 	try {
 		// Fetch the channels
 		const channels = await getChannels({ lnd });
-		console.log('Channels:', channels);
+		// console.log('Channels:', channels);
 
 		let totalLocalBalance = 0;
 		let totalRemoteBalance = 0;
@@ -85,14 +86,10 @@ async function fetchAndSummarizeBalances() {
 			totalRemoteBalance += Number(channel.remote_balance);
 		});
 
-		console.log('Total Local Balance:', totalLocalBalance);
-		console.log('Total Remote Balance:', totalRemoteBalance);
-
 		const newCombinedBalance = totalLocalBalance + totalRemoteBalance;
-		console.log('New Combined Balance:', newCombinedBalance);
 
 		if (isNaN(newCombinedBalance)) {
-			console.error('Combined Balance is not a number:', newCombinedBalance);
+			logger.error('Combined Balance is not a number:', newCombinedBalance);
 			return null;
 		}
 
@@ -106,7 +103,7 @@ async function fetchAndSummarizeBalances() {
 			const lastCombinedBalance = lastBalanceRecord.combinedBalance;
 
 			if (newCombinedBalance < lastCombinedBalance) {
-				console.error('Error: New combined balance is less than the previous combined balance. Potential fund loss.');
+				logger.error('Error: New combined balance is less than the previous combined balance. Potential fund loss.');
 				// Handle the error as needed
 				return null;
 			}
@@ -133,7 +130,7 @@ async function fetchAndSummarizeBalances() {
 			combinedBalance: newCombinedBalance,
 		};
 	} catch (error) {
-		console.error('Error fetching or summarizing balances:', error);
+		logger.error('Error fetching or summarizing balances:', error);
 		return null;
 	}
 }
@@ -147,17 +144,17 @@ let initialBalances;
 (async () => {
 	initialBalances = await fetchAndSummarizeBalances();
 	if (initialBalances) {
-		console.log(`Initial Total Local Balance: ${initialBalances.totalLocalBalance}`);
-		console.log(`Initial Total Remote Balance: ${initialBalances.totalRemoteBalance}`);
-		console.log(`Initial Combined Balance: ${initialBalances.combinedBalance}`);
+		logger.info(`Initial Total Local Balance: ${initialBalances.totalLocalBalance}`);
+		logger.info(`Initial Total Remote Balance: ${initialBalances.totalRemoteBalance}`);
+		logger.info(`Initial Combined Balance: ${initialBalances.combinedBalance}`);
 	} else {
-		console.log('Failed to fetch initial balances.');
+		logger.info('Failed to fetch initial balances.');
 	}
 })();
 
-console.log(`RPC Provider is running on ${RPC_URL}`);
-console.log(`WebSocket server is running on ws://localhost:${PORT || 3003}`);
-console.log(`LSP Address: ${signer.address}`);
+logger.info(`RPC Provider is running on ${RPC_URL}`);
+logger.info(`WebSocket server is running on ws://localhost:${PORT || 3003}`);
+logger.info(`LSP Address: ${signer.address}`);
 
 const serverState: ServerState = {
 	lnd,
@@ -174,14 +171,14 @@ const wss = new WebSocket.Server({
 });
 
 wss.on('connection', async (ws: WebSocket) => {
-	console.log('Client connected');
+	logger.info('Client connected');
 
 	// Get signer's balance info
 	const signerBalanceInfo = await getSignerBalance();
 	if (signerBalanceInfo) {
-		console.log('signerBalanceInfo', signerBalanceInfo);
+		logger.info('signerBalanceInfo', signerBalanceInfo);
 	} else {
-		console.log('Failed to fetch balance.');
+		logger.info('Failed to fetch balance.');
 	}
 
 	const uuid = uuidv4();
@@ -192,13 +189,13 @@ wss.on('connection', async (ws: WebSocket) => {
 		serverConfig: providerConfig,
 		uuid,
 		message: 'Connected to server',
-		signerSolvency: signerBalanceInfo.signerBalanceSolvency,
+		signerActive: signerBalanceInfo.isSignerBalanceActive,
 	};
 
 	ws.send(JSON.stringify(connectionResponse));
 
 	ws.on('message', async (message: string) => {
-		console.log('Received message:', message);
+		logger.info('Received message:', message);
 		const request: ClientRequest = JSON.parse(message);
 
 		match(request)
@@ -209,14 +206,14 @@ wss.on('connection', async (ws: WebSocket) => {
 				await processClientLightningReceiveRequest(request, ws, serverState);
 			})
 			.with({ kind: KIND.TX_HASH }, async (request) => {
-				await handleTxHash(request, serverState);
+				await handleTxHash(request, ws, serverState);
 			})
 			.otherwise((request) => {
-				console.warn('Unknown message kind:', request.kind);
+				logger.warn('Unknown message kind:', request.kind);
 			});
 	});
 
-	ws.on('close', () => console.log('Client disconnected'));
+	ws.on('close', () => logger.info('Client disconnected'));
 
 	// Poll every 30 seconds to process cached payments
 	setInterval(() => processCachedPayments(ws), 30000);
@@ -233,22 +230,22 @@ async function processCachedPayments(ws: WebSocket) {
 		});
 
 		if (cachedPayments.length === 0) {
-			console.log('No cached payments to process.');
+			logger.info('No cached payments to process.');
 			return;
 		}
-		console.log(`Processing ${cachedPayments.length} cached payments...`);
+		logger.info(`Processing ${cachedPayments.length} cached payments...`);
 
 		// Get signer's balance
 		const signerBalance = await getSignerBalance();
-		console.log(`Signer's balance: ${signerBalance.toString()} wei`);
+		logger.info(`Signer's balance: ${signerBalance.toString()} wei`);
 
 		for (const payment of cachedPayments) {
 			try {
-				console.log(`Attempting to withdraw for contractId: ${payment.contractId}`);
+				logger.info(`Attempting to withdraw for contractId: ${payment.contractId}`);
 				await htlcContract
 					.withdraw(payment.contractId, '0x' + payment.secret)
 					.then(async (tx) => {
-						console.log('Withdrawal Transaction Success:', tx);
+						logger.log('Withdrawal Transaction Success:', tx);
 
 						await prisma.transaction.update({
 							where: { contractId: payment.contractId },
@@ -259,19 +256,19 @@ async function processCachedPayments(ws: WebSocket) {
 						});
 						// Update the channel balances after processing the invoice
 						await updateChannelBalances(serverState.lnd);
-						console.log(`Successfully processed cached payment for contractId: ${payment.contractId}`);
+						logger.info(`Successfully processed cached payment for contractId: ${payment.contractId}`);
 						ws.send(JSON.stringify({ status: 'success', message: 'Invoice withdrawn successfully.' }));
 					})
 					.catch((error) => {
-						console.error(`Error with withdrawal for contractId ${payment.contractId}:`, error);
+						logger.error(`Error with withdrawal for contractId ${payment.contractId}:`, error);
 						// Handle retry logic or other actions as needed
 					});
 			} catch (error) {
-				console.error(`Error processing cached payment for contractId ${payment.contractId}:`, error);
+				logger.error(`Error processing cached payment for contractId ${payment.contractId}:`, error);
 			}
 		}
 	} catch (error) {
-		console.error('Error fetching cached payments:', error);
+		logger.error('Error fetching cached payments:', error);
 	}
 }
 
@@ -290,5 +287,5 @@ app.use('/api/transactions', transactionsRouter);
 
 // Start HTTP server
 app.listen(Number(HTTP_PORT) || 3002, () => {
-	console.log(`HTTP server is running on http://localhost:${HTTP_PORT || 3002}`);
+	logger.info(`HTTP server is running on http://localhost:${HTTP_PORT || 3002}`);
 });

@@ -42,7 +42,7 @@ const Home = () => {
   }
 
   const fetchTransactions = async () => {
-    if (!account) {
+    if (!account || !isWebSocketConnected) {
       setTransactionsHT([]);
       return;
     }
@@ -58,7 +58,7 @@ const Home = () => {
 
   useEffect(() => {
     fetchTransactions();
-  }, [account]);
+  }, [account, isWebSocketConnected]);
 
   // Refetch transactions when dbUpdated changes
   useEffect(() => {

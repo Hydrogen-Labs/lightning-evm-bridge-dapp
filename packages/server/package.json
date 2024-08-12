@@ -41,6 +41,8 @@
 		"ts-node": "^10.9.2",
 		"ts-pattern": "^5.1.1",
 		"uuid": "^9.0.1",
+		"winston": "^3.14.1",
+		"winston-daily-rotate-file": "^5.0.0",
 		"ws": "^8.16.0"
 	}
 }

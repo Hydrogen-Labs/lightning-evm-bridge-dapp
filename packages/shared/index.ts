@@ -89,7 +89,7 @@ export interface ConnectionResponse {
 	serverConfig: ProviderConfig;
 	uuid: string;
 	message: string;
-	signerSolvency: boolean;
+	signerActive: boolean;
 }
 
 export type ServerResponse = InvoiceResponse | ConnectionResponse | HodlInvoiceResponse | HodlInvoiceContractResponse;

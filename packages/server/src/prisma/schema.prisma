@@ -25,14 +25,14 @@ model Transaction {
   id                Int              @id @default(autoincrement())
   status            TransactionStatus
   date              DateTime
-  amount            Int
-  txHash            String            
-  contractId        String            @unique
+  amount            Int?
+  txHash            String?            
+  contractId        String?            @unique
   secret            String?
-  hashLockTimestamp Int
-  lnInvoice         String
-  userAddress       String
-  transactionType   TransactionType
+  hashLockTimestamp Int?
+  lnInvoice         String?
+  userAddress       String?
+  transactionType   TransactionType?
 }
 
 model ChannelBalance {

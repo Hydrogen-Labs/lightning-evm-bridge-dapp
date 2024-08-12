@@ -54,7 +54,7 @@ export function Step1({
       </div>
       <button
         className="btn btn-secondary rounded-none w-full"
-        disabled={isGenerateQRDisabled()}
+        disabled={isGenerateQRDisabled() || recipientAddress === "" || recipientAddress === "0x123...321"}
         onClick={() => onClickContinue()}
       >
         Generate Service Fee Invoice
