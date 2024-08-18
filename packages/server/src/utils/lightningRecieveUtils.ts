@@ -207,6 +207,9 @@ async function processPaidHodlInvoice(
 					await prisma.transaction.create({
 						data: transactionData,
 					});
+
+					// Send a success message to the client
+					ws.send(JSON.stringify({ status: 'success', message: 'Settling hodl invoice.' }));
 				} catch (error) {
 					logger.error('Error creating new transaction:', error);
 				}

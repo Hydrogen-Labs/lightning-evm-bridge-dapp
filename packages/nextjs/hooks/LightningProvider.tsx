@@ -141,6 +141,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
 
   useEffect(() => {
     if (data === null) return;
+    setDbUpdated(true);
     const lastTransaction = transactionRef.current[0];
     if (lastTransaction === undefined) return;
 
@@ -152,12 +153,12 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     addTransaction(updatedTransaction);
 
     if (data?.status === "pending") {
-      setDbUpdated(true);
+      // setDbUpdated(true);
       toastSuccess("Payment pending");
     }
 
     if (data?.status === "success") {
-      setDbUpdated(true);
+      // setDbUpdated(true);
       toastSuccess("Payment successful");
     } else {
       toastError(data.message);

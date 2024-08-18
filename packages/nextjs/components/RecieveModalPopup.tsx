@@ -37,6 +37,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     hodlInvoiceResponse,
     setHashLock,
     recieveContractId,
+    signerActive,
   } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
@@ -294,6 +295,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
                   amount,
                   invoice,
                   recipientAddress,
+                  signerActive,
                   setRecipientAddress,
                   setAmount,
                   onClickContinue,

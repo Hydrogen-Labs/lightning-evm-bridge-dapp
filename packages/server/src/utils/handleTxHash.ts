@@ -30,8 +30,8 @@ export async function handleTxHash(request: TxHashMessage, ws: WebSocket, server
 
 		logger.info('Updated transaction record:', updatedRecord);
 
-		// // Send a success message to the client
-		// ws.send(JSON.stringify({ status: 'success', message: 'Transaction hash updated successfully.' }));
+		// Send a success message to the client
+		ws.send(JSON.stringify({ status: 'success', message: 'Transaction hash updated successfully.' }));
 
 		// Update the channel balances after processing the invoice
 		await updateChannelBalances(serverState.lnd);

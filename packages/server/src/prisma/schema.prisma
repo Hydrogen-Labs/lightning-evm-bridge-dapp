@@ -25,13 +25,13 @@ model Transaction {
   id                Int              @id @default(autoincrement())
   status            TransactionStatus
   date              DateTime
-  amount            Int?
+  amount            Int
   txHash            String?            
-  contractId        String?            @unique
+  contractId        String            @unique
   secret            String?
-  hashLockTimestamp Int?
-  lnInvoice         String?
-  userAddress       String?
+  hashLockTimestamp Int
+  lnInvoice         String
+  userAddress       String
   transactionType   TransactionType?
 }
 
@@ -40,5 +40,6 @@ model ChannelBalance {
   date              DateTime @default(now())
   totalLocalBalance Int
   totalRemoteBalance Int
+  totalUnsettledBalance Int
   combinedBalance   Int
 }

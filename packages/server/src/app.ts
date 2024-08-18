@@ -75,18 +75,20 @@ async function fetchAndSummarizeBalances() {
 	try {
 		// Fetch the channels
 		const channels = await getChannels({ lnd });
-		// console.log('Channels:', channels);
+		console.log('Channels:', channels);
 
 		let totalLocalBalance = 0;
 		let totalRemoteBalance = 0;
+		let totalUnsettledBalance = 0;
 
 		// Iterate through each channel and sum up the balances
 		channels.channels.forEach((channel) => {
 			totalLocalBalance += Number(channel.local_balance);
 			totalRemoteBalance += Number(channel.remote_balance);
+			totalUnsettledBalance += Number(channel.unsettled_balance || 0);
 		});
 
-		const newCombinedBalance = totalLocalBalance + totalRemoteBalance;
+		const newCombinedBalance = totalLocalBalance + totalRemoteBalance + totalUnsettledBalance;
 
 		if (isNaN(newCombinedBalance)) {
 			logger.error('Combined Balance is not a number:', newCombinedBalance);
@@ -113,6 +115,7 @@ async function fetchAndSummarizeBalances() {
 			data: {
 				totalLocalBalance,
 				totalRemoteBalance,
+				totalUnsettledBalance,
 				combinedBalance: newCombinedBalance,
 			},
 		});
@@ -127,6 +130,7 @@ async function fetchAndSummarizeBalances() {
 		return {
 			totalLocalBalance,
 			totalRemoteBalance,
+			totalUnsettledBalance,
 			combinedBalance: newCombinedBalance,
 		};
 	} catch (error) {

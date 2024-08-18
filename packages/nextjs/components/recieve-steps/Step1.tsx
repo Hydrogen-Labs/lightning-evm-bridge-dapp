@@ -6,6 +6,7 @@ export function Step1({
   amount,
   invoice,
   recipientAddress,
+  signerActive,
   setRecipientAddress,
   setAmount,
   onClickContinue,
@@ -14,6 +15,7 @@ export function Step1({
   amount: bigint;
   invoice: string;
   recipientAddress: string;
+  signerActive: boolean;
   setRecipientAddress: (val: string) => void;
   setAmount: (val: bigint) => void;
   onClickContinue: () => void;
@@ -54,7 +56,9 @@ export function Step1({
       </div>
       <button
         className="btn btn-secondary rounded-none w-full"
-        disabled={isGenerateQRDisabled() || recipientAddress === "" || recipientAddress === "0x123...321"}
+        disabled={
+          isGenerateQRDisabled() || recipientAddress === "" || recipientAddress === "0x123...321" || !signerActive
+        }
         onClick={() => onClickContinue()}
       >
         Generate Service Fee Invoice
