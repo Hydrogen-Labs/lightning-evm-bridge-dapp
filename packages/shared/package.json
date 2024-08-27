@@ -1,7 +1,8 @@
 {
-  "name": "@lightning-evm-bridge/shared",
-  "packageManager": "yarn@3.2.3",
-  "devDependencies": {
-    "typescript": "^5.4.5"
-  }
+	"name": "@lightning-evm-bridge/shared",
+	"version": "1.0.0",
+	"packageManager": "yarn@3.2.3",
+	"devDependencies": {
+		"typescript": "^5.4.5"
+	}
 }

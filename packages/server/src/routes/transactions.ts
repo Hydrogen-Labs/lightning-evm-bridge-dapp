@@ -7,11 +7,11 @@ import { checkRefundedFlag } from '../utils/validation';
 const router = express.Router();
 
 router.post('/refund', async (req, res) => {
-	const { transactionId, txHash } = req.body;
+	const { contractId, txHash } = req.body;
 
 	try {
 		// Find the transaction
-		const transaction = await prisma.transaction.findUnique({ where: { id: transactionId } });
+		const transaction = await prisma.transaction.findUnique({ where: { contractId: contractId } });
 
 		if (!transaction) {
 			return res.status(404).json({ error: 'Transaction not found' });
@@ -28,8 +28,8 @@ router.post('/refund', async (req, res) => {
 
 		// Update transaction status in the database
 		const updatedTransaction = await prisma.transaction.update({
-			where: { id: transactionId },
-			data: { status: 'REFUNDED', date: new Date().toISOString(), txHash },
+			where: { contractId: contractId },
+			data: { status: 'REFUNDED', date: new Date().toISOString(), txHash: txHash },
 		});
 
 		res.status(200).json(updatedTransaction);

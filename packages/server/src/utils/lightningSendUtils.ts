@@ -170,17 +170,42 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 	} catch (error) {
 		logger.error('Error during invoice processing:', error);
 		try {
-			// Update the transaction to FAILED status
-			await prisma.transaction.update({
+			// Check if the transaction exists
+			const existingTransaction = await prisma.transaction.findUnique({
 				where: { contractId: request.contractId },
-				data: {
-					status: TransactionStatus.FAILED,
-					date: new Date().toISOString(),
-				},
 			});
-			logger.info('Payment failed, transaction status updated to FAILED.');
+
+			if (existingTransaction) {
+				// Update the transaction to FAILED status if it exists
+				await prisma.transaction.update({
+					where: { contractId: request.contractId },
+					data: {
+						status: TransactionStatus.FAILED,
+						date: new Date().toISOString(),
+					},
+				});
+				logger.info('Payment failed, transaction status updated to FAILED.');
+			} else {
+				// Create a new transaction with FAILED status if it doesn't exist
+				const lnInvoiceDetails = decode(request.lnInvoice);
+				const contractDetails: ContractDetails = await getContractDetails(request.contractId, serverState.htlcContract);
+				await prisma.transaction.create({
+					data: {
+						status: TransactionStatus.FAILED,
+						date: new Date().toISOString(),
+						amount: lnInvoiceDetails.satoshis,
+						txHash: request.txHash,
+						contractId: request.contractId,
+						hashLockTimestamp: lnInvoiceDetails.timeExpireDate,
+						lnInvoice: lnInvoiceDetails.paymentRequest,
+						userAddress: contractDetails.sender,
+						transactionType: TransactionType.SENT,
+					},
+				});
+				logger.info('Payment failed, new transaction created with FAILED status.');
+			}
 		} catch (error) {
-			logger.error('Error updating transaction to FAILED:', error);
+			logger.error('Error updating/creating transaction to FAILED:', error);
 		}
 		ws.send(JSON.stringify({ status: 'error', message: 'Failed to process invoice.' }));
 	}

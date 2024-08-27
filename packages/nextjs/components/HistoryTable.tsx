@@ -3,6 +3,7 @@ import { Transaction } from "@lightning-evm-bridge/shared";
 import "react-toastify/dist/ReactToastify.css";
 import { useWalletClient } from "wagmi";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { useGlobalState } from "~~/services/store/store";
 
 type HistoryTableProps = {
   account: string | undefined;
@@ -11,6 +12,7 @@ type HistoryTableProps = {
 };
 
 export const HistoryTable = ({ account, transactionsHT, setTransactionsHT }: HistoryTableProps) => {
+  const { setDbUpdated } = useGlobalState();
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const { data: walletClient } = useWalletClient();
   const { data: htlcContract } = useScaffoldContract({
@@ -69,12 +71,14 @@ export const HistoryTable = ({ account, transactionsHT, setTransactionsHT }: His
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ transactionId: transaction.contractId, txHash: tx }),
+          body: JSON.stringify({ contractId: transaction.contractId, txHash: tx }),
         })
           .then(response => response.json())
-          .then(data => console.log("Server updated:", data))
+          .then(data => {
+            setDbUpdated(true);
+            // TODO -> set toast "refunded"
+          })
           .catch(error => console.error("Error updating server:", error));
-
         setTransactionsHT(prevTransactions =>
           prevTransactions.map(t => (t.txHash === transaction.txHash ? updatedTransaction : t)),
         );
@@ -236,7 +240,7 @@ export const HistoryTable = ({ account, transactionsHT, setTransactionsHT }: His
                                   onClick={account ? () => initiateRefund(index) : undefined}
                                   disabled={
                                     transactionsHT[index].status === "FAILED" &&
-                                    transactionsHT[index].hashLockTimestamp < Date.now() / 1000
+                                    transactionsHT[index].hashLockTimestamp > Date.now() / 1000
                                   }
                                 >
                                   Initiate Refund

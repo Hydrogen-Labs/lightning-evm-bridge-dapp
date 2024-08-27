@@ -1,34 +1,36 @@
 # Base Node.js Image
 FROM node:18-alpine AS base
+
 WORKDIR /app
+
 RUN apk add --no-cache libc6-compat
 
 ENV NEXT_PUBLIC_API_URL="http://localhost:8888"
-# Copy the entire workspace to utilize Docker's cache efficiently and manage dependencies
-# Assuming you're still aiming for a structure that involves separate handling for each package,
-# and building from the workspace root to include necessary context
-COPY package.json yarn.lock ./
-COPY packages/nextjs/package.json packages/nextjs/
+
+# Copy the Yarn configuration files and root package.json
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn .yarn
+
+# Copy the nextjs package to ensure its dependencies are available
+COPY packages/nextjs/. ./packages/nextjs
+COPY packages/shared/. ./packages/shared
 
 # Change to the directory of the specific package
 WORKDIR /app/packages/nextjs
 
-# Install dependencies for the specific package
+# Install dependencies for the specific package with Yarn workspaces support
 RUN yarn install
 
-# Copy the application source code and build the application
-COPY packages/nextjs/. .
+# Build the application
 RUN yarn build
 
 # Production stage
 FROM base AS runner
-WORKDIR /app
 
-# Corrected the stage name from 'deps' to 'base' since 'deps' stage does not exist
-# If you meant to copy from the build stage, you should reference it by its correct name or alias.
-COPY --from=base /app/packages/nextjs/.next ./.next
-COPY --from=base /app/packages/nextjs/public ./public
+WORKDIR /app/packages/nextjs
 
+# Copy the server package files from the base stage
+COPY --from=base /app /app
 
 # Run the application
 CMD ["yarn", "start"]
