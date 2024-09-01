@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const RETRY_INTERVAL = 30000; // 30 seconds
 const TIMEOUT = 1200000; // 20 minutes
 
-async function checkChannelBalances(
+export async function checkChannelBalances(
 	lnd: any
 ): Promise<{ totalLocalBalance: number; totalRemoteBalance: number; totalUnsettledBalance: number; newCombinedBalance: number }> {
 	const channels = await getChannels({ lnd });
@@ -21,6 +21,11 @@ async function checkChannelBalances(
 	});
 
 	const newCombinedBalance = totalLocalBalance + totalRemoteBalance + totalUnsettledBalance;
+
+	logger.info(`Channel Balances: Local - ${totalLocalBalance}`);
+	logger.info(`Channel Balances: Remote - ${totalRemoteBalance}`);
+	logger.info(`Channel Balances: Unsettled - ${totalUnsettledBalance}`);
+	logger.info(`Channel Balances: Combined - ${newCombinedBalance}`);
 
 	return { totalLocalBalance, totalRemoteBalance, totalUnsettledBalance, newCombinedBalance };
 }

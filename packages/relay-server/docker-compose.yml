@@ -5,7 +5,7 @@ services:
     platform: linux/amd64
     build:
       context: .
-      dockerfile: packages/relay-server/Dockerfile
+      dockerfile: Dockerfile
     image: botanix-ln-relay-server:latest
     ports:
       - '3004:3004'

@@ -20,7 +20,7 @@ ENV PRISMA_GENERATE_SCHEMA_PATH=src/prisma/schema.prisma
 WORKDIR /app/packages/server
 RUN yarn install
 
-# Ensure Prisma binaries are downloaded using npx
+# Ensure Prisma binaries are downloaded
 RUN yarn prisma generate --schema=$PRISMA_GENERATE_SCHEMA_PATH
 
 # Stage 2: Production

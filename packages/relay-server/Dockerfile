@@ -3,33 +3,34 @@ FROM node:18 AS base
 
 WORKDIR /app
 
-# Copy the Yarn configuration files and root package.json
-COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn .yarn
+# Copy the package.json
+COPY package.json ./
 
-# Copy the relay-server package to ensure its dependencies are available
-COPY packages/relay-server/. ./packages/relay-server
+# Copy the rest of the application files
+COPY . .
 
-# Install dependencies using Yarn, resolving workspace packages
-WORKDIR /app/packages/relay-server
+# Install dependencies using Yarn
 RUN yarn install
+
+# Compile TypeScript to JavaScript
+RUN yarn build
 
 # Stage 2: Production
 FROM node:18-slim AS production
 
-WORKDIR /app/packages/relay-server
+WORKDIR /app
 
 # Install development libraries
 RUN apt-get update && apt-get install -y
 
-# Copy the server package files from the base stage
+# Copy the compiled application from the base stage
 COPY --from=base /app /app
 
-# Expose the necessary ports
-EXPOSE 3004 3004
+# Expose the necessary port
+EXPOSE 3004
 
 # Define environment variables
-ENV PORT=3003
+ENV PORT=3004
 ENV NODE_ENV=production
 
 # Run the app

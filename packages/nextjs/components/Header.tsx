@@ -89,7 +89,7 @@ export const Header = () => {
       </div>
       <div className="navbar-end flex-grow mr-4">
         <button
-          className="btn btn-ghost btn-sm text-white font-plex"
+          className="btn btn-ghost btn-sm text-white font-plex hover:bg-transparent hover:cursor-default"
           onClick={() => {
             if (!isWebSocketConnected) reconnect();
           }}

@@ -48,8 +48,6 @@ The Lightning Server connects to a configured Lightning node and acts as a payme
 
 ### Running the Server
 
-Before starting the server, ensure that your .env file is correctly configured with the DATABASE_URL. Make sure to update it depending on whether you are running the server with Docker or manually.
-
 - **With Docker:**
 
   ```bash
