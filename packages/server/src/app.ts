@@ -8,35 +8,37 @@ import * as WebSocket from 'ws';
 import transactionsRouter from './routes/transactions';
 
 import { ClientRequest, ConnectionResponse, KIND, ServerStatus, deployedContracts } from '@lightning-evm-bridge/shared';
-import { authenticatedLndGrpc } from 'lightning';
+import { TransactionStatus } from '@prisma/client';
+import { authenticatedLndGrpc, getChannels } from 'lightning';
 import { match } from 'ts-pattern';
+import logger from './logger';
 import { providerConfig } from './provider.config';
 import { CachedPayment, ServerState } from './types/types';
+import { checkChannelBalances, updateChannelBalances } from './utils/balanceUtils';
 import { handleTxHash } from './utils/handleTxHash';
 import { processClientLightningReceiveRequest } from './utils/lightningRecieveUtils';
 import { processClientInvoiceRequest } from './utils/lightningSendUtils';
+import { processCachedPayments } from './utils/paymentUtils';
+import { getSignerBalance } from './utils/signerUtils';
+const { PrismaClient } = require('@prisma/client');
 
 dotenv.config();
 
 // Verify environment variables
 const { PORT, LND_MACAROON, LND_SOCKET, RPC_URL, LSP_PRIVATE_KEY, CHAIN_ID, LND_TLS_CERT, HTTP_PORT } = process.env;
 if (!RPC_URL || !LSP_PRIVATE_KEY || !CHAIN_ID) {
-	console.error('Missing environment variables');
+	logger.error('Missing environment variables');
 	process.exit(1);
 }
 
-// Initialize WebSocket services
-const wss = new WebSocket.Server({
-	port: Number(PORT) || 3003,
-	clientTracking: true,
-});
-
+// Initialize LND gRPC connection
 const { lnd } = authenticatedLndGrpc({
 	cert: LND_TLS_CERT,
 	macaroon: LND_MACAROON,
 	socket: LND_SOCKET,
 });
 
+// Initialize provider and signer
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(LSP_PRIVATE_KEY, provider);
 const htlcContractInfo = deployedContracts[CHAIN_ID]?.HashedTimelock;
@@ -47,9 +49,15 @@ let sockets: { [id: string]: WebSocket } = {};
 let cachedPayments: CachedPayment[] = [];
 let pendingContracts: string[] = [];
 
-console.log(`RPC Provider is running on ${RPC_URL}`);
-console.log(`WebSocket server is running on ws://localhost:${PORT || 3003}`);
-console.log(`LSP Address: ${signer.address}`);
+// Fetch initial balances at the start
+(async () => {
+	await updateChannelBalances(lnd);
+	await checkChannelBalances(lnd);
+})();
+
+logger.info(`RPC Provider is running on ${RPC_URL}`);
+logger.info(`WebSocket server is running on ws://localhost:${PORT || 3003}`);
+logger.info(`LSP Address: ${signer.address}`);
 
 const serverState: ServerState = {
 	lnd,
@@ -59,8 +67,22 @@ const serverState: ServerState = {
 	serverStatus,
 };
 
-wss.on('connection', (ws: WebSocket) => {
-	console.log('Client connected');
+// Initialize WebSocket services
+const wss = new WebSocket.Server({
+	port: Number(PORT) || 3003,
+	clientTracking: true,
+});
+
+wss.on('connection', async (ws: WebSocket) => {
+	logger.info('Client connected');
+
+	// Get signer's balance info
+	const signerBalanceInfo = await getSignerBalance();
+	if (signerBalanceInfo) {
+		logger.info('signerBalanceInfo', signerBalanceInfo);
+	} else {
+		logger.info('Failed to fetch balance.');
+	}
 
 	const uuid = uuidv4();
 	sockets[uuid] = ws;
@@ -70,17 +92,14 @@ wss.on('connection', (ws: WebSocket) => {
 		serverConfig: providerConfig,
 		uuid,
 		message: 'Connected to server',
+		signerActive: signerBalanceInfo.isSignerBalanceActive,
 	};
 
 	ws.send(JSON.stringify(connectionResponse));
 
 	ws.on('message', async (message: string) => {
-		console.log('Received message:', message);
+		logger.info('Received message:', message);
 		const request: ClientRequest = JSON.parse(message);
-
-		// Extract and log the kind of the message
-		console.log(`Message kind: ${request.kind}`);
-		console.log(`Full message: ${JSON.stringify(request, null, 2)}`);
 
 		match(request)
 			.with({ kind: KIND.INVOICE_SEND }, async (request) => {
@@ -90,48 +109,20 @@ wss.on('connection', (ws: WebSocket) => {
 				await processClientLightningReceiveRequest(request, ws, serverState);
 			})
 			.with({ kind: KIND.TX_HASH }, async (request) => {
-				await handleTxHash(request);
+				await handleTxHash(request, ws, serverState);
 			})
 			.otherwise((request) => {
-				console.warn('Unknown message kind:', request.kind);
+				logger.warn('Unknown message kind:', request.kind);
 			});
 	});
 
-	ws.on('close', () => console.log('Client disconnected'));
+	ws.on('close', () => logger.info('Client disconnected'));
+
+	// Poll every 30 seconds to process cached payments
+	setInterval(() => processCachedPayments(ws, lnd), 30000);
 });
 
-// Function to process cached payments
-async function processCachedPayments() {
-	if (cachedPayments.length === 0) {
-		return;
-	}
-	console.log(`Processing ${cachedPayments.length} cached payments...`);
-	for (let i = 0; i < cachedPayments.length; i++) {
-		const payment = cachedPayments[i];
-		try {
-			console.log(`Attempting to withdraw for contractId: ${payment.contractId}`);
-			const options = { gasPrice: ethers.parseUnits('0.001', 'gwei') };
-			await htlcContract
-				.withdraw(payment.contractId, '0x' + payment.secret) // remove options
-				.then((tx) => {
-					console.log('Withdrawal Transaction Success:', tx);
-					// Remove the successfully processed payment from the cache
-					cachedPayments = cachedPayments.filter((p) => p.contractId !== payment.contractId);
-				})
-				.catch(async (error) => {
-					// try again with a higher gas price
-					// carefull consideration should be given to the gas price
-					await htlcContract.withdraw(payment.contractId, '0x' + payment.secret);
-				});
-		} catch (error) {
-			console.error(`Error processing cached payment for contractId ${payment.contractId}:`, error);
-			// Handle any unexpected errors here
-		}
-	}
-}
-
-// Poll every 30 seconds
-setInterval(processCachedPayments, 30000);
+const prisma = new PrismaClient();
 
 // Express HTTP server setup
 const app = express();
@@ -148,5 +139,5 @@ app.use('/api/transactions', transactionsRouter);
 
 // Start HTTP server
 app.listen(Number(HTTP_PORT) || 3002, () => {
-	console.log(`HTTP server is running on http://localhost:${HTTP_PORT || 3002}`);
+	logger.info(`HTTP server is running on http://localhost:${HTTP_PORT || 3002}`);
 });

@@ -5,6 +5,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 enum TransactionType {
@@ -18,6 +19,7 @@ enum TransactionStatus {
   COMPLETED
   REFUNDED
   RELAYED
+  CACHED
 }
 
 model Transaction {
@@ -25,10 +27,20 @@ model Transaction {
   status            TransactionStatus
   date              DateTime
   amount            Int
-  txHash            String            
+  txHash            String?            
   contractId        String            @unique
+  secret            String?
   hashLockTimestamp Int
   lnInvoice         String
   userAddress       String
-  transactionType   TransactionType
+  transactionType   TransactionType?
+}
+
+model ChannelBalance {
+  id                Int      @id @default(autoincrement())
+  date              DateTime @default(now())
+  totalLocalBalance Int
+  totalRemoteBalance Int
+  totalUnsettledBalance Int
+  combinedBalance   Int
 }

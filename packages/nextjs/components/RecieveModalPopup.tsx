@@ -37,14 +37,14 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
     hodlInvoiceResponse,
     setHashLock,
     recieveContractId,
-    addTransaction,
+    signerActive,
   } = useLightningApp();
   const [invoice, setInvoice] = useState<string>("");
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [amount, setAmount] = useState<bigint>(BigInt(0));
   const lnInvoiceRef = useRef<LnPaymentInvoice | null>(null);
   const [txHash, setTxHash] = useState<string>("");
-  const { setDbUpdated } = useGlobalState();
+  const { account, setDbUpdated } = useGlobalState();
 
   const { data: walletClient } = useWalletClient();
   function cleanAndClose() {
@@ -76,7 +76,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
         sendMessage(txHashMessage);
         setActiveStep(3);
         setTxHash(msg.txHash);
-        setDbUpdated(true);
+        // setDbUpdated(true);
       } else {
         toastError("Failed to relay contract and preimage");
       }
@@ -91,10 +91,10 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
   });
 
   useEffect(() => {
-    if (walletClient?.account.address && recipientAddress === "") {
+    if (walletClient?.account.address) {
       setRecipientAddress(walletClient.account.address);
     }
-  }, [walletClient?.account.address]);
+  }, [walletClient?.account.address, account]);
 
   useEffect(() => {
     if (recieveContractId === "") {
@@ -295,6 +295,7 @@ function RecieveModal({ isOpen, onClose }: RecieveModalProps) {
                   amount,
                   invoice,
                   recipientAddress,
+                  signerActive,
                   setRecipientAddress,
                   setAmount,
                   onClickContinue,

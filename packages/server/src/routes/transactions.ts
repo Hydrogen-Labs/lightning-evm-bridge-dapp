@@ -1,4 +1,5 @@
 import express from 'express';
+import logger from '../logger';
 import prisma from '../prismaClient';
 import { getContractInstance } from '../utils/contract'; // Utility to get contract instance
 import { checkRefundedFlag } from '../utils/validation';
@@ -6,11 +7,11 @@ import { checkRefundedFlag } from '../utils/validation';
 const router = express.Router();
 
 router.post('/refund', async (req, res) => {
-	const { transactionId, txHash } = req.body;
+	const { contractId, txHash } = req.body;
 
 	try {
 		// Find the transaction
-		const transaction = await prisma.transaction.findUnique({ where: { id: transactionId } });
+		const transaction = await prisma.transaction.findUnique({ where: { contractId: contractId } });
 
 		if (!transaction) {
 			return res.status(404).json({ error: 'Transaction not found' });
@@ -27,13 +28,13 @@ router.post('/refund', async (req, res) => {
 
 		// Update transaction status in the database
 		const updatedTransaction = await prisma.transaction.update({
-			where: { id: transactionId },
-			data: { status: 'REFUNDED', date: new Date().toISOString(), txHash },
+			where: { contractId: contractId },
+			data: { status: 'REFUNDED', date: new Date().toISOString(), txHash: txHash },
 		});
 
 		res.status(200).json(updatedTransaction);
 	} catch (error) {
-		console.error('Error verifying refund:', error);
+		logger.error('Error verifying refund:', error);
 		res.status(500).json({ error: 'Internal Server Error' });
 	}
 });
@@ -56,7 +57,7 @@ router.get('/', async (req, res) => {
 		});
 		res.status(200).json(transactions);
 	} catch (error) {
-		console.error('Failed to fetch transactions:', error);
+		logger.error('Failed to fetch transactions:', error);
 		res.status(500).json({ error: 'Failed to fetch transactions' });
 	}
 });

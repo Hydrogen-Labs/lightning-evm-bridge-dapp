@@ -5,12 +5,11 @@ import {
 	InitiationRequest,
 	InitiationResponse,
 	KIND,
-	RelayResponse,
 } from '@lightning-evm-bridge/shared';
 import { TransactionStatus, TransactionType } from '@prisma/client';
-import { ethers } from 'ethers';
 import { cancelHodlInvoice, createHodlInvoice, createInvoice, settleHodlInvoice, subscribeToInvoice } from 'lightning';
 import * as WebSocket from 'ws';
+import logger from '../logger';
 import prisma from '../prismaClient';
 import { providerConfig } from '../provider.config';
 import { ServerState } from '../types/types';
@@ -18,7 +17,7 @@ import { getContractDetails } from './validation';
 
 // Helper functions
 function logError(context, error) {
-	console.error(`Error in ${context}:`, error);
+	logger.error(`Error in ${context}:`, error);
 }
 
 function sendWebSocketMessage(ws, message) {
@@ -28,18 +27,18 @@ function sendWebSocketMessage(ws, message) {
 // Main processing functions
 export async function processClientLightningReceiveRequest(request: InitiationRequest, ws: WebSocket, serverState: ServerState) {
 	try {
-		console.log('Creating initiation invoice');
+		logger.info('Creating initiation invoice');
 		const invoice = await createInvoice({
 			lnd: serverState.lnd,
 			tokens: providerConfig.recieveBaseFee,
 		});
 
-		console.log('Initiation Invoice:', invoice);
+		logger.info('Initiation Invoice:', invoice);
 		const initiationResponse: InitiationResponse = {
 			lnInvoice: invoice.request,
 		};
 
-		console.log('Initiation Response:', initiationResponse);
+		logger.info('Initiation Response:', initiationResponse);
 		sendWebSocketMessage(ws, initiationResponse);
 
 		const sub = subscribeToInvoice({
@@ -50,7 +49,7 @@ export async function processClientLightningReceiveRequest(request: InitiationRe
 		sub.on('invoice_updated', (invoice) => {
 			handleSetupInvoiceUpdate(invoice, ws, sub, request, serverState, initiationResponse);
 		});
-		console.log('Subscribed to invoice updates');
+		logger.info('Subscribed to invoice updates');
 	} catch (error) {
 		logError('Creating Invoice', error);
 		sendWebSocketMessage(ws, {
@@ -73,7 +72,7 @@ async function handleSetupInvoiceUpdate(
 	if (!invoice.is_confirmed) return;
 
 	sub.removeAllListeners();
-	const expiryTime = Math.floor(Date.now() / 1000) + 600;
+	const expiryTime = Math.floor(Date.now() / 1000) + 600; // 10 minutes
 
 	try {
 		const hodlInvoice = await createHodlInvoice({
@@ -139,13 +138,13 @@ async function processPaidHodlInvoice(
 
 	var contractId: string | undefined = undefined;
 
-	console.log('Creating on-chain contract');
+	logger.info('Creating on-chain contract');
 
 	await serverState.htlcContract
 		.newContract(request.recipient, '0x' + request.hashlock, BigInt(expiryTime), options)
 		.then(async (tx: any) => {
 			await tx.wait().then(async (res) => {
-				console.log('Contract Logs:', res.logs[0].args[0]);
+				logger.info('Contract Logs:', res.logs[0].args[0]);
 				contractId = res.logs[0].args[0];
 				const hodlInvoiceContractResponse: HodlInvoiceContractResponse = {
 					kind: KIND.HODL_CONTRACT_RES,
@@ -155,7 +154,7 @@ async function processPaidHodlInvoice(
 			});
 		})
 		.catch((error: any) => {
-			console.error('Contract Error:', error);
+			logger.error('Contract Error:', error);
 			ws.send(
 				JSON.stringify({
 					status: 'error',
@@ -164,28 +163,28 @@ async function processPaidHodlInvoice(
 			);
 			return;
 		});
-	console.log('Processing paid hodl invoice');
+	logger.info('Processing paid hodl invoice');
 
 	while (true && contractId) {
-		console.log('Checking hodl invoice status');
+		logger.info('Checking hodl invoice status');
 
 		try {
 			const now = Math.floor(Date.now() / 1000);
 			if (now > expiryTime) {
-				console.log('Expiry time reached, cancelling hodl invoice');
+				logger.info('Expiry time reached, cancelling hodl invoice');
 				const res = await cancelHodlInvoice({
 					lnd: serverState.lnd,
 					id,
 				});
-				console.log('Hodl Invoice Cancelled:', res);
+				logger.info('Hodl Invoice Cancelled:', res);
 				return;
 			}
 
 			const contractDetails = await getContractDetails(contractId, serverState.htlcContract);
 
-			console.log('Contract Details:', contractDetails);
+			logger.info('Contract Details:', contractDetails);
 			if (contractDetails.withdrawn) {
-				console.log('Preimage found, settling hodl invoice');
+				logger.info('Preimage found, settling hodl invoice');
 
 				await settleHodlInvoice({
 					lnd: serverState.lnd,
@@ -194,10 +193,9 @@ async function processPaidHodlInvoice(
 
 				try {
 					const transactionData = {
-						status: TransactionStatus.COMPLETED,
+						status: TransactionStatus.PENDING,
 						date: new Date().toISOString(),
 						amount: Number(contractDetails.amount),
-						txHash: '',
 						contractId: contractId,
 						hashLockTimestamp: 0,
 						lnInvoice: initiationResponse.lnInvoice,
@@ -209,14 +207,17 @@ async function processPaidHodlInvoice(
 					await prisma.transaction.create({
 						data: transactionData,
 					});
+
+					// Send a success message to the client
+					ws.send(JSON.stringify({ status: 'success', message: 'Settling hodl invoice.' }));
 				} catch (error) {
-					console.error('Error creating new transaction:', error);
+					logger.error('Error creating new transaction:', error);
 				}
 
 				return;
 			}
 		} catch (error) {
-			console.error('Error processing hodl invoice:', error);
+			logger.error('Error processing hodl invoice:', error);
 		}
 		// wait for 5 seconds before checking again
 		await new Promise((resolve) => setTimeout(resolve, 5000));

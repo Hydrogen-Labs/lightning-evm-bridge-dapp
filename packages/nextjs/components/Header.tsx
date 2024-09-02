@@ -57,16 +57,16 @@ export const HeaderMenuLinks = () => {
  */
 export const Header = () => {
   const { isWebSocketConnected, reconnect, lspStatus } = useLightningApp();
-  function getColorFromStatus(status: ServerStatus) {
-    switch (status) {
-      case ServerStatus.ACTIVE:
-        return "bg-success";
-      case ServerStatus.INACTIVE:
-        return "bg-error";
-      case ServerStatus.MOCK:
-        return "bg-warning";
-    }
-  }
+  // function getColorFromStatus(status: ServerStatus) {
+  //   switch (status) {
+  //     case ServerStatus.ACTIVE:
+  //       return "bg-success";
+  //     case ServerStatus.INACTIVE:
+  //       return "bg-error";
+  //     case ServerStatus.MOCK:
+  //       return "bg-warning";
+  //   }
+  // }
 
   function getTooltipFromStatus(status: ServerStatus) {
     switch (status) {
@@ -89,13 +89,15 @@ export const Header = () => {
       </div>
       <div className="navbar-end flex-grow mr-4">
         <button
-          className="btn btn-ghost btn-sm text-white font-plex"
+          className="btn btn-ghost btn-sm text-white font-plex hover:bg-transparent hover:cursor-default"
           onClick={() => {
             if (!isWebSocketConnected) reconnect();
           }}
         >
           <div
-            className={`tooltip tooltip-bottom ${getColorFromStatus(lspStatus)} rounded-full w-2 h-2 self-center`}
+            className={`tooltip tooltip-bottom ${
+              isWebSocketConnected ? "bg-success" : "bg-error"
+            } rounded-full w-2 h-2 self-center`}
             data-tip={getTooltipFromStatus(lspStatus)}
           ></div>
           {isWebSocketConnected ? "LSP Connected" : "LSP Disconnected"}

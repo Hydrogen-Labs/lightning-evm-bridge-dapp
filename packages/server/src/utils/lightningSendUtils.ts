@@ -4,9 +4,11 @@ import { decode } from 'bolt11';
 import { ethers } from 'ethers';
 import { pay } from 'lightning';
 import * as WebSocket from 'ws';
+import logger from '../logger';
 import prisma from '../prismaClient';
 import { providerConfig } from '../provider.config';
 import { ServerState } from '../types/types';
+import { updateChannelBalances } from './balanceUtils';
 import { getContractDetails, validateLnInvoiceAndContract } from './validation';
 
 export async function processClientInvoiceRequest(request: InvoiceRequest, ws: WebSocket, serverState: ServerState) {
@@ -23,7 +25,7 @@ export async function processClientInvoiceRequest(request: InvoiceRequest, ws: W
 	try {
 		await processInvoiceRequest(request, ws, serverState);
 	} catch (error) {
-		console.error('Error processing message:', error);
+		logger.error('Error processing message:', error);
 		ws.send(JSON.stringify({ status: 'error', message: 'Invalid request' }));
 	}
 	serverState.pendingContracts = serverState.pendingContracts.filter((c) => c !== request.contractId);
@@ -35,11 +37,11 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 		return;
 	}
 
-	console.log('Invoice Request Received:', request);
+	logger.info('Invoice Request Received:', request);
 
 	// Check if LND_MACAROON and LND_SOCKET are empty to simulate mock mode
 	if (!process.env.LND_MACAROON && !process.env.LND_SOCKET) {
-		console.log('Mock Server Mode: Simulating payment success');
+		logger.info('Mock Server Mode: Simulating payment success');
 
 		// Simulate processing delay
 		await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay for realism
@@ -66,15 +68,15 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 		}
 
 		const lnInvoiceDetails = decode(request.lnInvoice);
-		console.log('LN Invoice Details:', lnInvoiceDetails);
+		logger.info('LN Invoice Details:', lnInvoiceDetails);
 
 		const contractDetails: ContractDetails = await getContractDetails(request.contractId, serverState.htlcContract);
-		console.log('Contract Details:', contractDetails);
+		logger.info('Contract Details:', contractDetails);
 
 		const validation = validateLnInvoiceAndContract(lnInvoiceDetails, contractDetails);
 
 		if (!validation.isValid) {
-			console.log('Invoice and Contract are invalid:', validation.message);
+			logger.info('Invoice and Contract are invalid:', validation.message);
 			ws.send(
 				JSON.stringify({
 					status: 'error',
@@ -108,33 +110,73 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 			})
 		);
 
-		// Simulate processing delay
-		// await new Promise((resolve) => setTimeout(resolve, 10000)); // 10 second delay for testing purposes
+		logger.info('Invoice and Contract are valid, proceeding with payment');
 
-		console.log('Invoice and Contract are valid, proceeding with payment');
 		const paymentResponse = await pay({
 			lnd: serverState.lnd,
 			request: request.lnInvoice,
 			max_fee: providerConfig.maxLNFee,
 		});
 
-		console.log('Payment Response:', paymentResponse);
-		if (paymentResponse) {
-			try {
-				// Update the existing transaction in the database
-				await prisma.transaction.update({
-					where: { contractId: request.contractId },
-					data: {
-						status: TransactionStatus.COMPLETED,
-						date: new Date().toISOString(),
-					},
-				});
-			} catch (error) {
-				console.error('Error updating transaction to COMPLETED:', error);
-			}
-		} else {
-			try {
-				// Update the transaction to FAILED status
+		logger.info('Payment Response:', paymentResponse);
+
+		// ws.send(
+		// 	JSON.stringify({
+		// 		status: 'pending',
+		// 		message: 'Invoice paid successfully.',
+		// 	})
+		// );
+
+		// Critical point, if this withdraw fails, the LSP will lose funds
+		// We should cache the paymentResponse.secret and request.contractId and retry the withdrawal if it fails
+		await serverState.htlcContract
+			.withdraw(request.contractId, '0x' + paymentResponse.secret) // remove options
+			.then(async (tx: any) => {
+				logger.info('Withdrawal Transaction:', tx);
+				try {
+					// Update the existing transaction in the database
+					await prisma.transaction.update({
+						where: { contractId: request.contractId },
+						data: {
+							status: TransactionStatus.COMPLETED,
+							date: new Date().toISOString(),
+						},
+					});
+					// Update the channel balances after processing the invoice
+					await updateChannelBalances(serverState.lnd);
+					ws.send(JSON.stringify({ status: 'success', message: 'Invoice withdrawn successfully.' }));
+				} catch (error) {
+					logger.error('Error updating transaction to COMPLETED:', error);
+				}
+			})
+			.catch(async (error: any) => {
+				logger.error('Withdrawal Error:', error);
+				try {
+					await prisma.transaction.update({
+						where: { contractId: request.contractId },
+						data: {
+							status: TransactionStatus.CACHED,
+							secret: paymentResponse.secret,
+							date: new Date().toISOString(),
+						},
+					});
+					logger.info('Cached payment added to the database.');
+					// ws.send(JSON.stringify({ status: 'pending', message: 'Invoice cached successfully.' }));
+				} catch (dbError) {
+					logger.error('Error caching payment:', dbError);
+				}
+			});
+		logger.info('Payment processed successfully');
+	} catch (error) {
+		logger.error('Error during invoice processing:', error);
+		try {
+			// Check if the transaction exists
+			const existingTransaction = await prisma.transaction.findUnique({
+				where: { contractId: request.contractId },
+			});
+
+			if (existingTransaction) {
+				// Update the transaction to FAILED status if it exists
 				await prisma.transaction.update({
 					where: { contractId: request.contractId },
 					data: {
@@ -142,35 +184,29 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 						date: new Date().toISOString(),
 					},
 				});
-				console.log('Payment failed, transaction status updated to FAILED.');
-			} catch (error) {
-				console.error('Error updating transaction to FAILED:', error);
-			}
-		}
-
-		ws.send(
-			JSON.stringify({
-				status: 'success',
-				message: 'Invoice paid successfully.',
-			})
-		);
-		// Critical point, if this withdraw fails, the LSP will lose funds
-		// We should cache the paymentResponse.secret and request.contractId and retry the withdrawal if it fails
-		await serverState.htlcContract
-			.withdraw(request.contractId, '0x' + paymentResponse.secret) // remove options
-			.then((tx: any) => {
-				console.log('Withdrawal Transaction:', tx);
-			})
-			.catch((error: any) => {
-				console.error('Withdrawal Error:', error);
-				serverState.cachedPayments.push({
-					contractId: request.contractId,
-					secret: paymentResponse.secret,
+				logger.info('Payment failed, transaction status updated to FAILED.');
+			} else {
+				// Create a new transaction with FAILED status if it doesn't exist
+				const lnInvoiceDetails = decode(request.lnInvoice);
+				const contractDetails: ContractDetails = await getContractDetails(request.contractId, serverState.htlcContract);
+				await prisma.transaction.create({
+					data: {
+						status: TransactionStatus.FAILED,
+						date: new Date().toISOString(),
+						amount: lnInvoiceDetails.satoshis,
+						txHash: request.txHash,
+						contractId: request.contractId,
+						hashLockTimestamp: lnInvoiceDetails.timeExpireDate,
+						lnInvoice: lnInvoiceDetails.paymentRequest,
+						userAddress: contractDetails.sender,
+						transactionType: TransactionType.SENT,
+					},
 				});
-			});
-		console.log('Payment processed successfully');
-	} catch (error) {
-		console.error('Error during invoice processing:', error);
+				logger.info('Payment failed, new transaction created with FAILED status.');
+			}
+		} catch (error) {
+			logger.error('Error updating/creating transaction to FAILED:', error);
+		}
 		ws.send(JSON.stringify({ status: 'error', message: 'Failed to process invoice.' }));
 	}
 }

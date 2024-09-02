@@ -1,4 +1,5 @@
 import React from "react";
+import { Transaction } from "@lightning-evm-bridge/shared";
 import { useLightningApp } from "~~/hooks/LightningProvider";
 import { LnPaymentInvoice } from "~~/types/utils";
 
@@ -9,6 +10,8 @@ type PaymentInvoiceProps = {
   submitPayment: () => void;
   cancelPayment: () => void;
   step: number;
+  balance: number | null;
+  transactionsHT: Transaction[];
 };
 
 export const steps = [
@@ -21,9 +24,22 @@ export const steps = [
   { title: "Paid", description: "The lightning provider pays lightning invoice. The reciever must be online." },
 ];
 
-export const PaymentInvoice = ({ invoice, submitPayment, cancelPayment, step }: PaymentInvoiceProps) => {
+export const PaymentInvoice = ({
+  invoice,
+  submitPayment,
+  cancelPayment,
+  step,
+  balance,
+  transactionsHT,
+}: PaymentInvoiceProps) => {
   const expiryDate = new Date(invoice.timeExpireDate * 1000);
-  const { price } = useLightningApp();
+  const { price, signerActive } = useLightningApp();
+
+  // Check if the invoice has already been paid
+  const isPaid = transactionsHT.some(transaction => transaction.lnInvoice === invoice.lnInvoice);
+
+  // Format to satoshis
+  const satoshiBalance = (balance ?? 0) * 100_000_000;
 
   // Calculate USD value of the invoice
   const formatBTCBalance = (sats: number) => {
@@ -93,15 +109,25 @@ export const PaymentInvoice = ({ invoice, submitPayment, cancelPayment, step }: 
           >
             Cancel
           </button>
-          <button
-            className={`btn btn-success bg-emerald-700 w-2/5 text-white ${
-              step !== 1 ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-            onClick={() => submitPayment()}
-            disabled={step == 2 || step == 3}
-          >
-            Pay
-          </button>
+          {isPaid ? (
+            <button className="btn btn-error w-2/5 text-white" disabled={true}>
+              Already Paid
+            </button>
+          ) : satoshiBalance >= invoice.satoshis ? (
+            <button
+              className={`btn btn-success bg-emerald-700 w-2/5 text-white ${
+                step !== 1 ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              onClick={() => submitPayment()}
+              disabled={step == 2 || step == 3 || !signerActive}
+            >
+              Pay
+            </button>
+          ) : (
+            <button className="btn btn-error w-2/5 text-white" disabled={true}>
+              Insufficient Balance
+            </button>
+          )}
         </div>
       ) : (
         <button

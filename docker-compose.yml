@@ -5,19 +5,53 @@ services:
     build:
       context: .
       dockerfile: packages/nextjs/Dockerfile
-    image: botanix-ln-webapp:latest  
+    image: botanix-ln-webapp:latest
     ports:
-      - "3000:3000"
+      - '3000:3000'
     depends_on:
       - server
     restart: always
+    networks:
+      - bridge-network
 
   server:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: packages/server/Dockerfile
     image: botanix-ln-server:latest
     ports:
-      - "3003:3003"
+      - '3003:3003' # WS server
+      - '3002:3002' # HTTP server
+    entrypoint: sh -c 'yarn prisma db push --schema=src/prisma/schema.prisma && yarn start'
+    environment:
+      - PORT=3003
+      - HTTP_PORT=3002
+      - PRISMA_CLI_QUERY_ENGINE_TYPE=binary
+      - PRISMA_CLIENT_ENGINE_TYPE=binary
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@prisma:5432/evmdapp
+      - LND_SOCKET=polar-n1-alice:10009 # Use service name for internal network
     restart: always
+    networks:
+      - bridge-network
 
+  prisma:
+    image: postgres:14.1-alpine
+    volumes:
+      - db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRED_DB=evmdapp
+    restart: always
+    networks:
+      - bridge-network
+
+volumes:
+  db:
+    driver: local
+
+networks:
+  bridge-network:
+    external: true

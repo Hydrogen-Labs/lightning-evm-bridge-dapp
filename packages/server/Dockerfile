@@ -1,33 +1,46 @@
-# Use an official Node.js runtime as a parent image
-FROM node:14
+# Stage 1: Base dependencies
+FROM node:18 AS base
 
-# Set the working directory in the container
-WORKDIR /packages/server/src/
+WORKDIR /app
 
-# Copy package.json and package-lock.json to leverage Docker cache
-# to speed up build times when dependencies haven't changed
-COPY packages/server/package*.json ./
+# Copy the Yarn configuration files and root package.json
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn .yarn
 
-# Install dependencies
-RUN npm install
+# Copy the server package to ensure its dependencies are available
+COPY packages/server/. ./packages/server
+COPY packages/shared/. ./packages/shared
 
-# If you're using TypeScript, install TypeScript and ts-node globally
-RUN npm install -g typescript ts-node
+# Set the environment variable for Prisma
+ENV PRISMA_CLI_QUERY_ENGINE_TYPE=binary
+ENV PRISMA_CLIENT_ENGINE_TYPE=binary
+ENV PRISMA_GENERATE_SCHEMA_PATH=src/prisma/schema.prisma
 
-# Copy the current directory contents into the container at /usr/src/app
-COPY packages/server/. .
+# Install dependencies using Yarn, resolving workspace packages
+WORKDIR /app/packages/server
+RUN yarn install
 
+# Ensure Prisma binaries are downloaded
+RUN yarn prisma generate --schema=$PRISMA_GENERATE_SCHEMA_PATH
 
-# Make port available to the world outside this container
-EXPOSE 3003
+# Stage 2: Production
+FROM node:18-slim AS production
+
+WORKDIR /app/packages/server
+
+# Install OpenSSL and development libraries
+RUN apt-get update && apt-get install -y openssl libssl-dev
+
+# Copy the server package files from the base stage
+COPY --from=base /app /app
+
+# Expose the necessary ports
+EXPOSE 3003 3002
 
 # Define environment variables
 ENV PORT=3003
+ENV HTTP_PORT=3002
 ENV NODE_ENV=production
 
-# Add .env file and other necessary files
-# Use .dockerignore to exclude files from your container
-COPY packages/server/.env .
-
-# Run the app when the container launches
-CMD ["ts-node", "src/app.ts"]
+# Run the app
+CMD ["yarn", "start"]

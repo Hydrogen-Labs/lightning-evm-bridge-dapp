@@ -16,7 +16,7 @@ import { HashLock } from "~~/types/utils";
 
 // Define the types for your historical transactions and context
 export type HistoricalTransaction = {
-  status: "PENDING" | "FAILED" | "COMPLETED" | "REFUNDED" | "RELAYED";
+  status: "PENDING" | "FAILED" | "COMPLETED" | "REFUNDED" | "RELAYED" | "CACHED";
   date: string;
   amount: number;
   contractId: string;
@@ -40,6 +40,7 @@ export type LightningAppContextType = {
   lspStatus: ServerStatus;
   lnInitationResponse: InitiationResponse | null;
   hodlInvoiceResponse: HodlInvoiceResponse | null;
+  signerActive: boolean;
   hashLock: HashLock | null;
   setHashLock: (hashLock: HashLock) => void;
   recieveContractId: string;
@@ -70,6 +71,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     lnInitationResponse,
     recieveContractId,
     hodlInvoiceResponse,
+    signerActive,
   } = useWebSocket(process.env.WEBSOCKET_URL ?? "ws://localhost:3003");
 
   const toastSuccess = (message: string) => {
@@ -139,6 +141,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
 
   useEffect(() => {
     if (data === null) return;
+    setDbUpdated(true);
     const lastTransaction = transactionRef.current[0];
     if (lastTransaction === undefined) return;
 
@@ -150,11 +153,12 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     addTransaction(updatedTransaction);
 
     if (data?.status === "pending") {
-      setDbUpdated(true);
+      // setDbUpdated(true);
       toastSuccess("Payment pending");
     }
 
     if (data?.status === "success") {
+      // setDbUpdated(true);
       toastSuccess("Payment successful");
     } else {
       toastError(data.message);
@@ -201,28 +205,6 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     }
     setTransactions(updatedTransactions);
     setDbUpdated(true);
-
-    // try {
-    //   console.log("Saving transaction to server:", updatedTransaction);
-    //   const response = await fetch("http://localhost:3002/api/transactions/process", {
-    //     method: "POST",
-    //     headers: {
-    //       "Content-Type": "application/json",
-    //     },
-    //     body: JSON.stringify(updatedTransaction),
-    //   });
-
-    //   if (!response.ok) {
-    //     throw new Error("Failed to save transaction");
-    //   }
-    //   const result = await response.json();
-    //   console.log("Transaction saved:", result);
-
-    //   // Set the dbUpdated flag to true
-    //   setDbUpdated(true);
-    // } catch (error) {
-    //   console.error("Error saving transaction:", error);
-    // }
   };
 
   return (
@@ -240,6 +222,7 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
         lspStatus: status,
         lnInitationResponse,
         hodlInvoiceResponse,
+        signerActive,
         hashLock,
         setHashLock,
         recieveContractId,
