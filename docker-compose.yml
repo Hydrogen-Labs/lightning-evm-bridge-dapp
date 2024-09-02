@@ -11,6 +11,8 @@ services:
     depends_on:
       - server
     restart: always
+    networks:
+      - bridge-network
 
   server:
     platform: linux/amd64
@@ -31,6 +33,8 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@prisma:5432/evmdapp
       - LND_SOCKET=polar-n1-alice:10009 # Use service name for internal network
     restart: always
+    networks:
+      - bridge-network
 
   prisma:
     image: postgres:14.1-alpine
@@ -41,7 +45,13 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRED_DB=evmdapp
     restart: always
+    networks:
+      - bridge-network
 
 volumes:
   db:
     driver: local
+
+networks:
+  bridge-network:
+    external: true

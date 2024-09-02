@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { ethers } from 'ethers';
 import express, { Request, Response } from 'express';
 import { sha256 } from 'js-sha256';
-import { ContractDetails, deployedContracts, KIND, parseContractDetails, RelayRequest, RelayResponse } from '../shared';
+import { ContractDetails, deployedContracts, KIND, parseContractDetails, RelayRequest, RelayResponse } from './../../shared';
 
 dotenv.config();
 

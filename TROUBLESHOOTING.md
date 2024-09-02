@@ -76,37 +76,40 @@ If containers are not communicating properly, ensure they are on the same networ
 1. **Check if the Containers are on the Same Network**:
 
    ```bash
-   docker network inspect bridge
+   docker network inspect bridge-network
    OR
    docker network ls
    ```
 
-   Look under the `Containers` section to ensure all relevant containers are listed. If they are not listed, it means they are not connected to the `bridge` network.
-
-2. **Connect `lightning-evm-bridge-dapp` Containers to the Bridge Network**:
-   If you find that `lightning-evm-bridge-dapp` containers are not connected to the `bridge` network, connect them manually:
+   If the custom network is not listed, create it manually:
 
    ```bash
-   docker network connect bridge lightning-evm-bridge-dapp-webapp-1
-   docker network connect bridge lightning-evm-bridge-dapp-server-1
-   docker network connect bridge lightning-evm-bridge-dapp-prisma-1
+   docker network create bridge-network
+   ```
+
+   Look under the `Containers` section to ensure all relevant containers are listed. If they are not listed, it means they are not connected to the `bridge-network` network.
+
+2. **Connect `lightning-evm-bridge-dapp` Containers to the Bridge Network**:
+   If you find that `lightning-evm-bridge-dapp` containers are not connected to the `bridge-network` network, connect them manually:
+
+   ```bash
+   docker network connect bridge-network lightning-evm-bridge-dapp-webapp-1
+   docker network connect bridge-network lightning-evm-bridge-dapp-server-1
+   docker network connect bridge-network lightning-evm-bridge-dapp-prisma-1
    ```
 
 3. **Connect `polar` Network Containers to the Bridge Network**:
    Similarly, if `polar` containers are not connected, you can manually connect them:
 
    ```bash
-   docker network connect bridge polar-n1-carol
-   docker network connect bridge polar-n1-bob
-   docker network connect bridge polar-n1-alice
-   docker network connect bridge polar-n1-backend1
+   docker network connect bridge-network polar-n1-alice
    ```
 
 4. **Connect `relay-server` Containers to the Bridge Network**:
-   If you find that `relay-server` containers are not connected to the `bridge` network, connect them manually:
+   If you find that `relay-server` containers are not connected to the `bridge-network` network, connect them manually:
 
    ```bash
-   docker network connect bridge relay-server-relay-server-1
+   docker network connect bridge-network relay-server-relay-server-1
    ```
 
 5. **Ping Between Containers**:
@@ -132,9 +135,6 @@ If containers are not communicating properly, ensure they are on the same networ
 
   ```bash
   docker logs polar-n1-alice
-  docker logs polar-n1-bob
-  docker logs polar-n1-carol
-  docker logs polar-n1-backend1
   ```
 
   or

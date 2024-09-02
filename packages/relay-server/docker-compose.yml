@@ -4,8 +4,8 @@ services:
   relay-server:
     platform: linux/amd64
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./..
+      dockerfile: relay-server/Dockerfile
     image: botanix-ln-relay-server:latest
     ports:
       - '3004:3004'
@@ -13,3 +13,9 @@ services:
       - PORT=3004
       - NODE_ENV=production
     restart: always
+    networks:
+      - bridge-network
+
+networks:
+  bridge-network:
+    external: true

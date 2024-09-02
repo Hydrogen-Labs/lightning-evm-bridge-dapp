@@ -4010,7 +4010,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@lightning-evm-bridge/relay-server@workspace:packages/relay-server"
   dependencies:
-    "@lightning-evm-bridge/shared": "workspace:^"
+    "@lightning-evm-bridge/shared": "file:./../shared"
     "@types/body-parser": ^1.19.5
     "@types/cors": ^2
     "@types/express": ^4.17.21
@@ -4062,6 +4062,13 @@ __metadata:
     ws: ^8.16.0
   languageName: unknown
   linkType: soft
+
+"@lightning-evm-bridge/shared@file:./../shared::locator=%40lightning-evm-bridge%2Frelay-server%40workspace%3Apackages%2Frelay-server":
+  version: 1.0.0
+  resolution: "@lightning-evm-bridge/shared@file:./../shared#./../shared::hash=4d275d&locator=%40lightning-evm-bridge%2Frelay-server%40workspace%3Apackages%2Frelay-server"
+  checksum: 382a5e7901ab7e473c8a09cb1f0d5a80f84b662bad03a72b140eb90c4427447d65744bc0d8f0a9fcfed0ea0e843e388b1a1b4f2685cb75b335aa8862847934f9
+  languageName: node
+  linkType: hard
 
 "@lightning-evm-bridge/shared@workspace:^, @lightning-evm-bridge/shared@workspace:packages/shared":
   version: 0.0.0-use.local
