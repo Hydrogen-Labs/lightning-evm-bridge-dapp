@@ -1,4 +1,4 @@
-import { ContractDetails, GWEIPERSAT, parseContractDetails } from '@lightning-evm-bridge/shared';
+import { ContractDetails, parseContractDetails } from '@lightning-evm-bridge/shared';
 import { PaymentRequestObject } from 'bolt11';
 import { ethers } from 'ethers';
 import { providerConfig } from '../provider.config';

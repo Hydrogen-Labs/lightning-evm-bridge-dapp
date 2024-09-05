@@ -29,7 +29,7 @@ The Lightning Server connects to a configured Lightning node and acts as a payme
    LND_SOCKET=your_lightning_node_socket
    ```
 
-   3. **Setting Up PostgreSQL (macOS (using Homebrew)):**
+3. **Setting Up PostgreSQL (macOS (using Homebrew)):**
 
    ```bash
    brew install postgresql
@@ -39,7 +39,7 @@ The Lightning Server connects to a configured Lightning node and acts as a payme
    \q
    ```
 
-3. **Setting Up Prisma:**
+4. **Setting Up Prisma:**
 
    ```bash
    yarn prisma generate --schema=src/prisma/schema.prisma

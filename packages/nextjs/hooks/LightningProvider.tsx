@@ -153,12 +153,10 @@ export const LightningProvider = ({ children }: { children: React.ReactNode }) =
     addTransaction(updatedTransaction);
 
     if (data?.status === "pending") {
-      // setDbUpdated(true);
       toastSuccess("Payment pending");
     }
 
     if (data?.status === "success") {
-      // setDbUpdated(true);
       toastSuccess("Payment successful");
     } else {
       toastError(data.message);

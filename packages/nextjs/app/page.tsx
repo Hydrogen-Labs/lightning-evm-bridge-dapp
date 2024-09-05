@@ -1,6 +1,5 @@
 "use client";
 
-// Import necessary hooks and components
 import { useEffect, useState } from "react";
 import "../styles/bg.css";
 import "../styles/glowButton.css";

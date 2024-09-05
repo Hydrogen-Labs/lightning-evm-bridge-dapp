@@ -29,7 +29,7 @@ The Relay Server monitors blockchain events related to HTLCs and interacts direc
    yarn install
    ```
 
-### Environment Configuration
+3. **Environment Setup:**
 
 Create an `.env` file based on the `sample.env` template included in the directory. Update the following keys with appropriate values:
 
@@ -38,15 +38,21 @@ RPC_URL="your_ethereum_rpc_url"
 PRIVATE_KEY="your_private_key_for_transaction_signing"
 ```
 
-## Running the Server
+### Running the Relay-Server
 
-To start the Relay Server, use:
+- **With Docker:**
 
-```bash
-yarn start
-```
+  ```bash
+  docker-compose up --build
+  ```
 
-This command will initiate the server, which listens for blockchain events and processes HTLC claims automatically.
+- **Manually:**
+
+  ```bash
+  yarn start
+  ```
+
+  This command will initiate the server, which listens for blockchain events and processes HTLC claims automatically.
 
 ## Features
 

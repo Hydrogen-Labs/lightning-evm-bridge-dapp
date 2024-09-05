@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { Toaster } from "react-hot-toast";
 import { WagmiConfig, useAccount } from "wagmi";
 import { Footer } from "~~/components/Footer";
@@ -9,7 +9,6 @@ import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { ProgressBar } from "~~/components/scaffold-eth/ProgressBar";
 import { LightningProvider, useLightningApp } from "~~/hooks/LightningProvider";
-import { useDarkMode } from "~~/hooks/scaffold-eth/useDarkMode";
 import { useGlobalState } from "~~/services/store/store";
 import { botanixTestnet } from "~~/services/web3/botanixTestnet";
 import { sepoliaTestnet } from "~~/services/web3/sepoliaTestnet";
@@ -49,8 +48,6 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const ScaffoldEthAppWithProviders = ({ children }: { children: React.ReactNode }) => {
-  const { isDarkMode } = useDarkMode();
-
   return (
     <WagmiConfig config={wagmiConfig}>
       <ProgressBar />
@@ -58,7 +55,6 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
         // chains={[...appChains.chains, botanixTestnet]}
         chains={[...appChains.chains, sepoliaTestnet]}
         avatar={BlockieAvatar}
-        // theme={isDarkMode ? darkTheme() : lightTheme()}
       >
         <LightningProvider>
           <ScaffoldEthApp>{children}</ScaffoldEthApp>
