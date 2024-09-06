@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Transaction } from "@lightning-evm-bridge/shared";
 import "react-toastify/dist/ReactToastify.css";
 import { useWalletClient } from "wagmi";
@@ -101,7 +101,6 @@ export const HistoryTable = ({ account, transactionsHT, setTransactionsHT }: His
                 top: "0",
                 left: "0",
                 width: "100%",
-                // zIndex: "9999",
               }}
             >
               <tr className="text-sm font-extrabold border-0">

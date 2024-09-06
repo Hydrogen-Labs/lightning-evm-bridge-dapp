@@ -32,7 +32,6 @@ export async function getSignerBalance() {
 		const isSignerBalanceActive = signerBalance >= BigInt(1e17);
 		logger.info(`Signer's active: ${isSignerBalanceActive}`);
 
-		// Return the desired values
 		return {
 			signerBalance,
 			signerBalanceInEther,
@@ -40,9 +39,8 @@ export async function getSignerBalance() {
 		};
 	} catch (error) {
 		logger.error('Error fetching balance:', error);
-		return null; // Handle error scenario
+		return null;
 	}
 }
 
-// Export the initialized objects and status
 export { htlcContract, provider, serverStatus, signer };

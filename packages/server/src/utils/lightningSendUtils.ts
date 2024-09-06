@@ -59,8 +59,6 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 	}
 
 	try {
-		const options = { gasPrice: ethers.parseUnits('0.001', 'gwei') };
-
 		const contractExists = await serverState.htlcContract.haveContract(request.contractId);
 		if (!contractExists) {
 			ws.send(JSON.stringify({ status: 'error', message: 'Contract does not exist.' }));
@@ -120,17 +118,9 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 
 		logger.info('Payment Response:', paymentResponse);
 
-		// ws.send(
-		// 	JSON.stringify({
-		// 		status: 'pending',
-		// 		message: 'Invoice paid successfully.',
-		// 	})
-		// );
-
 		// Critical point, if this withdraw fails, the LSP will lose funds
-		// We should cache the paymentResponse.secret and request.contractId and retry the withdrawal if it fails
 		await serverState.htlcContract
-			.withdraw(request.contractId, '0x' + paymentResponse.secret) // remove options
+			.withdraw(request.contractId, '0x' + paymentResponse.secret)
 			.then(async (tx: any) => {
 				logger.info('Withdrawal Transaction:', tx);
 				try {
@@ -161,7 +151,6 @@ async function processInvoiceRequest(request: InvoiceRequest, ws: WebSocket, ser
 						},
 					});
 					logger.info('Cached payment added to the database.');
-					// ws.send(JSON.stringify({ status: 'pending', message: 'Invoice cached successfully.' }));
 				} catch (dbError) {
 					logger.error('Error caching payment:', dbError);
 				}

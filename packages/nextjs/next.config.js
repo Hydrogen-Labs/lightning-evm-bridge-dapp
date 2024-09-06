@@ -5,11 +5,9 @@ const nextConfig = {
   reactStrictMode: false,
   typescript: {
     ignoreBuildErrors: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
-    // ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
-    // ignoreDuringBuilds: true,
   },
   webpack: config => {
     config.resolve.fallback = { fs: false, net: false, tls: false };
@@ -22,7 +20,7 @@ const nextConfig = {
       {
         ...fileLoaderRule,
         test: /\.svg$/i,
-        resourceQuery: /url/, // *.svg?url
+        resourceQuery: /url/,
       },
       // Convert all other *.svg imports to React components
       {

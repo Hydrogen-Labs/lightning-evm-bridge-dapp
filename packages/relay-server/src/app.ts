@@ -35,10 +35,8 @@ app.post('/relay', async (req: Request, res: Response) => {
 			console.log(`Received relay request for contract ID: ${contractId} with preimage: ${preimage}`);
 
 			if (await validateContractAndPreimage(contractId, preimage)) {
-				const options = { gasPrice: ethers.parseUnits('0.001', 'gwei') };
-
 				await htlcContract
-					.withdraw(contractId, '0x' + preimage) // remove options
+					.withdraw(contractId, '0x' + preimage)
 					.then(async (tx: any) => {
 						await tx.wait().then(async () => {
 							console.log('Withdrawal Transaction:', tx);
@@ -49,7 +47,6 @@ app.post('/relay', async (req: Request, res: Response) => {
 								txHash: tx.hash,
 								contractId: contractId,
 							};
-							// Insert your logic here to interact with the smart contract
 							res.status(200).send(msg);
 						});
 					})

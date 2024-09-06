@@ -48,7 +48,7 @@ export const useWebSocket = (url: string) => {
     socket.current.onclose = () => {
       setIsWebSocketConnected(false);
       if (!reconnectInterval.current) {
-        reconnectInterval.current = setInterval(checkAndReconnect, 6000); // 20 seconds
+        reconnectInterval.current = setInterval(checkAndReconnect, 20000); // 20 seconds
       }
     };
     socket.current.onerror = event => setError(event);

@@ -1,18 +1,16 @@
-import bodyParser from 'body-parser'; // Import body-parser
-import cors from 'cors'; // Import cors
+import { ClientRequest, ConnectionResponse, KIND, ServerStatus, deployedContracts } from '@lightning-evm-bridge/shared';
+import bodyParser from 'body-parser';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import { ethers } from 'ethers';
-import express from 'express'; // Import express
+import express from 'express';
+import { authenticatedLndGrpc } from 'lightning';
+import { match } from 'ts-pattern';
 import { v4 as uuidv4 } from 'uuid';
 import * as WebSocket from 'ws';
-import transactionsRouter from './routes/transactions';
-
-import { ClientRequest, ConnectionResponse, KIND, ServerStatus, deployedContracts } from '@lightning-evm-bridge/shared';
-import { TransactionStatus } from '@prisma/client';
-import { authenticatedLndGrpc, getChannels } from 'lightning';
-import { match } from 'ts-pattern';
 import logger from './logger';
 import { providerConfig } from './provider.config';
+import transactionsRouter from './routes/transactions';
 import { CachedPayment, ServerState } from './types/types';
 import { checkChannelBalances, updateChannelBalances } from './utils/balanceUtils';
 import { handleTxHash } from './utils/handleTxHash';

@@ -24,19 +24,23 @@ This webapp is the front-end component of the Lightning EVM Bridge project, desi
    yarn install
    ```
 
-### Environment Configuration
-
-1. **Set up the `.env` file:**
+3. **Environment Setup:**
 
    Copy the `sample.env` or `sample.live.env` file depending on your setup preference (local or using pre-configured remote services) and rename it to `.env`. Fill in the necessary environment variables:
 
 ## Running Locally
 
-To start the webapp locally, you can run:
+- **With Docker:**
 
-```bash
-yarn dev
-```
+  ```bash
+  docker-compose up --build
+  ```
+
+- **Manually:**
+
+  ```bash
+  yarn dev
+  ```
 
 This command starts the Next.js development server on [http://localhost:3000](http://localhost:3000). Open your browser to this URL to view and interact with the webapp.
 

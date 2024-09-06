@@ -1,7 +1,7 @@
 import express from 'express';
 import logger from '../logger';
 import prisma from '../prismaClient';
-import { getContractInstance } from '../utils/contract'; // Utility to get contract instance
+import { getContractInstance } from '../utils/contract';
 import { checkRefundedFlag } from '../utils/validation';
 
 const router = express.Router();

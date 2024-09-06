@@ -1,5 +1,4 @@
 import { PrismaClient, TransactionStatus } from '@prisma/client';
-import { ethers } from 'ethers';
 import { WebSocket } from 'ws';
 import logger from '../logger';
 import { updateChannelBalances } from './balanceUtils';
@@ -53,7 +52,6 @@ export async function processCachedPayments(ws: WebSocket, lnd: any) {
 					})
 					.catch((error) => {
 						logger.error(`Error with withdrawal for contractId ${payment.contractId}:`, error);
-						// Handle retry logic or other actions as needed
 					});
 			} catch (error) {
 				logger.error(`Error processing cached payment for contractId ${payment.contractId}:`, error);

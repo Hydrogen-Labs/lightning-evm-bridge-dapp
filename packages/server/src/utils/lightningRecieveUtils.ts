@@ -132,7 +132,6 @@ async function processPaidHodlInvoice(
 	initiationResponse: InitiationResponse
 ) {
 	const options = {
-		// gasPrice: ethers.parseUnits("0.001", "gwei"),
 		value: BigInt(request.amount * GWEIPERSAT),
 	};
 
